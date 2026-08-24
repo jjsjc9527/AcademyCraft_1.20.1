@@ -1,118 +1,114 @@
 package cn.academy.ability.vanilla.meltdowner.skill;
 
 import cn.academy.ability.AbilityContext;
+import cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify;
 import cn.academy.datapart.AbilityData;
-import cn.academy.ability.vanilla.meltdowner.CatMeltdowner;
-import cn.academy.client.render.particle.MdParticleFactory;
-import cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify$;
-import cn.lambdalib2.registry.StateEventCallback;
 import cn.lambdalib2.s11n.network.NetworkMessage;
-import cn.lambdalib2.s11n.network.NetworkMessage.Listener;
-import cn.lambdalib2.s11n.network.NetworkS11nType;
-import cn.lambdalib2.s11n.network.TargetPoints;
 import cn.lambdalib2.util.RandUtils;
-import cn.lambdalib2.util.VecUtils;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import cn.academy.util.ACDefense;
 
-/**
- * @author WeAthFolD
- */
-@NetworkS11nType
-public class MDDamageHelper {
-    
-    private static final String MARKID = "md_marktick", RATEID = "md_markrate";
+public final class MDDamageHelper {
 
-    @StateEventCallback
-    private static void init(FMLInitializationEvent event) {
+    private MDDamageHelper() {}
+
+    private static final String MARK_TICK = "md_marktick", MARK_RATE = "md_markrate";
+
+    private static final int MARK_MIN_TICKS = 60;
+
+    public static void init() {
         MinecraftForge.EVENT_BUS.register(new Events());
     }
-    
-    static void attack(AbilityContext ctx, Entity target, float dmg) {
-        EntityPlayer player = ctx.player;
 
-        ctx.attack(target, dmg);
-        AbilityData aData = AbilityData.get(player);
-        if(aData.isSkillLearned(CatMeltdowner.radIntensify)) {
-            int marktick = Math.max(60, getMarkTick(player));
+    public static void attack(AbilityContext ctx, Entity target, float damage) {
+        ctx.attack(target, damage);
+        mark(ctx, target);
+    }
 
-            setMarkTick(target, marktick);
-            setMarkRate(target, RadiationIntensify$.MODULE$.getRate(aData));
-            NetworkMessage.sendToAllAround(
-                    TargetPoints.convert(player, 20),
-                    NetworkMessage.staticCaller(MDDamageHelper.class),
-                    "sync", player, marktick
-            );
+    public static void attackReflect(AbilityContext ctx, Entity target, float damage,
+                                     java.util.function.Consumer<cn.academy.event.ability.ReflectEvent> prefill,
+                                     java.util.function.Consumer<cn.academy.event.ability.ReflectEvent> onReflected) {
+        boolean[] blocked = {false};
+        ctx.attackReflect(target, damage, prefill, ev -> {
+            blocked[0] = true;
+            onReflected.accept(ev);
+        });
+        if (!blocked[0]) {
+            mark(ctx, target);
         }
     }
-    
-    private static int getMarkTick(Entity player) {
-        if(player.getEntityData().hasKey(MARKID))
-            return player.getEntityData().getInteger(MARKID);
-        else
-            return 0;
+
+    private static void mark(AbilityContext ctx, Entity target) {
+        if (target.level().isClientSide) {
+            return;
+        }
+        AbilityData aData = AbilityData.get(ctx.player);
+        if (!aData.isSkillLearned(RadiationIntensify.INSTANCE)) {
+            return;
+        }
+        int ticks = Math.max(MARK_MIN_TICKS, getMarkTick(target));
+        setMarkTick(target, ticks);
+        target.getPersistentData().putFloat(MARK_RATE, RadiationIntensify.getRate(aData));
+
+        NetworkMessage.sendToTracking(target, RadiationIntensify.INSTANCE,
+                RadiationIntensify.MSG_MARK, target, ticks);
     }
 
-    private static float getMarkRate(Entity entity) {
-        if(entity.getEntityData().hasKey(RATEID))
-            return entity.getEntityData().getFloat(RATEID);
-        else
-            return 0;
+    public static int getMarkTick(Entity e) {
+        return e.getPersistentData().getInt(MARK_TICK);
     }
 
-    private static void setMarkRate(Entity entity, float amt) {
-        entity.getEntityData().setFloat(RATEID, amt);
+    public static void setMarkTick(Entity e, int ticks) {
+        e.getPersistentData().putInt(MARK_TICK, ticks);
     }
 
-    @Listener(channel="sync", side= Side.CLIENT)
-    private static void setMarkTick(Entity player, int ticks) {
-        player.getEntityData().setInteger(MARKID, ticks);
+    private static float getMarkRate(Entity e) {
+        return e.getPersistentData().getFloat(MARK_RATE);
     }
-    
+
     public static class Events {
-        
+
         @SubscribeEvent
-        public void onLivingUpdate(LivingUpdateEvent event) {
-            int tick = getMarkTick(event.getEntity());
-            if(tick > 0)
-                setMarkTick(event.getEntity(), tick - 1);
-        }
-        
-        @SideOnly(Side.CLIENT)
-        @SubscribeEvent
-        public void onUpdateClient(LivingUpdateEvent event) {
-            Entity e = event.getEntity();
-            if(e.getEntityWorld().isRemote) {
-                if(getMarkTick(e) > 0) {
-                    int times = RandUtils.rangei(0, 3);
-                    while(times --> 0) {
-                        double r = RandUtils.ranged(.6, .7) * e.width;
-                        double theta = RandUtils.nextDouble() * 2 * Math.PI;
-                        double h = RandUtils.ranged(0, e.height);
-                        
-                        Vec3d pos = VecUtils.add(new Vec3d(e.posX, e.posY, e.posZ),
-                            new Vec3d(r * Math.sin(theta), h, r * Math.cos(theta)));
-                        Vec3d vel = VecUtils.multiply(VecUtils.random(), 0.02);
-                        e.getEntityWorld().spawnEntity(MdParticleFactory.INSTANCE.next(e.getEntityWorld(), pos, vel));
-                    }
+        public void onLivingTick(LivingEvent.LivingTickEvent event) {
+            LivingEntity e = event.getEntity();
+            int tick = getMarkTick(e);
+            if (tick > 0) {
+                setMarkTick(e, tick - 1);
+                if (e.level().isClientSide) {
+                    spawnParticles(e);
                 }
             }
         }
-        
+
         @SubscribeEvent
-        public void onLivingAttack(LivingHurtEvent event) {
-            if(getMarkTick(event.getEntityLiving()) > 0) {
-                event.setAmount(event.getAmount() * getMarkRate(event.getEntityLiving()));
+        public void onLivingHurt(LivingHurtEvent event) {
+            if (getMarkTick(event.getEntity()) <= 0) {
+                return;
+            }
+            float rate = getMarkRate(event.getEntity());
+            if (rate > 0) {
+                ACDefense.reduce(event, event.getAmount() * rate);
             }
         }
-        
+
+        private static void spawnParticles(LivingEntity e) {
+            int times = RandUtils.rangei(0, 3);
+            while (times-- > 0) {
+                double r = RandUtils.ranged(.6, .7) * e.getBbWidth();
+                double theta = RandUtils.nextDouble() * 2 * Math.PI;
+                double h = RandUtils.ranged(0, e.getBbHeight());
+                Vec3 at = new Vec3(e.getX() + r * Math.sin(theta), e.getY() + h, e.getZ() + r * Math.cos(theta));
+                Vec3 vel = new Vec3(RandUtils.ranged(-1, 1), RandUtils.ranged(-1, 1), RandUtils.ranged(-1, 1))
+                        .normalize().scale(0.02);
+                e.level().addParticle(cn.academy.ACParticles.MD.get(),
+                        at.x, at.y, at.z, vel.x, vel.y, vel.z);
+            }
+        }
     }
 }

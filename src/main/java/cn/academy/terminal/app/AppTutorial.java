@@ -1,53 +1,32 @@
 package cn.academy.terminal.app;
 
-import cn.academy.Resources;
 import cn.academy.client.gui.GuiTutorial;
 import cn.academy.terminal.App;
 import cn.academy.terminal.AppEnvironment;
-import cn.academy.terminal.RegApp;
-import cn.lambdalib2.util.RandUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
 public class AppTutorial extends App {
-    @RegApp
-    private static final AppTutorial instance = new AppTutorial();
 
-    public AppTutorial() {
+    public static AppTutorial instance = new AppTutorial();
+
+    private AppTutorial() {
         super("tutorial");
         setPreInstalled();
+
+        icon = getTexture("icon_1");
     }
 
     @Override
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public AppEnvironment createEnvironment() {
         return new AppEnvironment() {
             @Override
-            @SideOnly(Side.CLIENT)
+            @OnlyIn(Dist.CLIENT)
             public void onStart() {
-                Minecraft.getMinecraft().displayGuiScreen(new GuiTutorial());
+                Minecraft.getInstance().setScreen(new GuiTutorial());
             }
         };
-    }
-
-    // Random gives icon for more fun >)
-    @Override
-    @SideOnly(Side.CLIENT)
-    public ResourceLocation getIcon() {
-        float rand = RandUtils.nextFloat();
-        if (rand < 0.2f) {
-            return icon(0);
-        } else if (rand < 0.3f) {
-            return icon(1);
-        } else {
-            return icon(2);
-        }
-    }
-
-    @SideOnly(Side.CLIENT)
-    private ResourceLocation icon(int id) {
-        return Resources.preloadMipmapTexture("guis/apps/tutorial/icon_" + id);
     }
 }

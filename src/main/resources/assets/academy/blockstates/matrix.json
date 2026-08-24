@@ -1,1 +1,28 @@
-{"variants":{"normal":{"model":"academy:matrix"}},"__xconfgen":true}
+{
+  "variants": {
+    "sub=0": {
+      "model": "academy:block/matrix_ghost0"
+    },
+    "sub=1": {
+      "model": "academy:block/matrix_ghost1"
+    },
+    "sub=2": {
+      "model": "academy:block/matrix_ghost2"
+    },
+    "sub=3": {
+      "model": "academy:block/matrix_ghost3"
+    },
+    "sub=4": {
+      "model": "academy:block/matrix_ghost4"
+    },
+    "sub=5": {
+      "model": "academy:block/matrix_ghost5"
+    },
+    "sub=6": {
+      "model": "academy:block/matrix_ghost6"
+    },
+    "sub=7": {
+      "model": "academy:block/matrix_ghost7"
+    }
+  }
+}

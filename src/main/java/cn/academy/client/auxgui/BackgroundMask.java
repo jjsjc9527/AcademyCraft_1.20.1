@@ -4,56 +4,62 @@ import cn.academy.Resources;
 import cn.academy.datapart.AbilityData;
 import cn.academy.datapart.CPData;
 import cn.lambdalib2.auxgui.AuxGui;
-import cn.lambdalib2.registry.mc.gui.RegAuxGui;
+import cn.lambdalib2.util.Color;
 import cn.lambdalib2.util.Colors;
 import cn.lambdalib2.util.GameTimer;
 import cn.lambdalib2.util.HudUtils;
-import cn.lambdalib2.util.RenderUtils;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.Color;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
-@RegAuxGui
+@OnlyIn(Dist.CLIENT)
 public class BackgroundMask extends AuxGui {
-    
-    final ResourceLocation MASK = Resources.preloadMipmapTexture("effects/screen_mask");
-    
-    final Color CRL_OVERRIDE = new Color(208, 20, 20, 170);
-    
-    static final double CHANGE_PER_SEC = 1;
-    
-    double r, g, b, a;
-    
-    long lastFrame;
+
+    public static final BackgroundMask instance = new BackgroundMask();
+
+    public static void init() {
+        AuxGui.register(instance);
+    }
+
+    private final ResourceLocation MASK = Resources.getTexture("effects/screen_mask");
+
+    private final Color CRL_OVERRIDE = new Color(208, 20, 20, 170);
+
+    private static final double CHANGE_PER_SEC = 1;
+
+    private double r, g, b, a;
+
+    private long lastFrame;
+
+    private BackgroundMask() {}
 
     @Override
-    public void draw(ScaledResolution sr) {
+    public void draw(GuiGraphics gg, float width, float height) {
         double time = GameTimer.getTime();
-        
-        EntityPlayer player = Minecraft.getMinecraft().player;
+
+        Player player = Minecraft.getInstance().player;
+        if (player == null) return;
+
+        if (!cn.lambdalib2.datapart.EntityData.isReady(player)) return;
         AbilityData aData = AbilityData.get(player);
         CPData cpData = CPData.get(player);
-        
+
         double cr, cg, cb, ca;
-        
+
         Color color = null;
-        if(cpData.isOverloaded()) {
+        if (cpData.isOverloaded()) {
             color = CRL_OVERRIDE;
-        } else if (cpData.isActivated()) {
+        } else if (cpData.isActivated() && aData.hasCategory()) {
+
             color = aData.getCategory().getColorStyle();
         }
-        
-        if(color == null) {
+
+        if (color == null) {
+
             cr = r;
             cg = g;
             cb = b;
@@ -64,27 +70,26 @@ public class BackgroundMask extends AuxGui {
             cb = Colors.i2f(color.getBlue());
             ca = Colors.i2f(color.getAlpha());
         }
-        
-        if(ca != 0 || a != 0) {
+
+        if (ca != 0 || a != 0) {
             long dt = lastFrame == 0 ? 0 : (long) (time * 1000) - lastFrame;
             r = balanceTo(r, cr, dt);
             g = balanceTo(g, cg, dt);
             b = balanceTo(b, cb, dt);
             a = balanceTo(a, ca, dt);
-            
-            GL11.glColor4d(r, g, b, a);
-            GL11.glDisable(GL11.GL_ALPHA_TEST);
-            GlStateManager.bindTexture(0);
-            RenderUtils.loadTexture(MASK);
-            HudUtils.rect(0, 0, sr.getScaledWidth_double(), sr.getScaledHeight_double());
-            GL11.glColor4f(1, 1, 1, 1);
-            GL11.glEnable(GL11.GL_ALPHA_TEST);
+
+            HudUtils.setPose(gg.pose());
+            RenderSystem.setShaderColor((float) r, (float) g, (float) b, (float) a);
+            HudUtils.loadTexture(MASK);
+            HudUtils.rect(0, 0, width, height);
+            RenderSystem.setShaderColor(1, 1, 1, 1);
         } else {
+
             r = cr;
             g = cg;
             b = cb;
         }
-        
+
         lastFrame = (long) (time * 1000);
     }
 
@@ -93,5 +98,4 @@ public class BackgroundMask extends AuxGui {
         delta = Math.signum(delta) * Math.min(Math.abs(delta), dt / 1000.0 * CHANGE_PER_SEC);
         return from + delta;
     }
-    
 }

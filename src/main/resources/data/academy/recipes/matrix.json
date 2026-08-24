@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ " R ", "EME", "DRD" ], "key": { "R": { "item": "academy:reso_crystal" }, "E": { "item": "minecraft:redstone" }, "M": { "item": "academy:machine_frame" }, "D": { "item": "academy:data_chip" } }, "result": { "item": "academy:matrix" } }

@@ -1,0 +1,7 @@
+{
+  "parent": "academy:block/node_base",
+  "textures": {
+    "side": "academy:block/node_basic_side_4",
+    "vert": "academy:block/node_top_0"
+  }
+}

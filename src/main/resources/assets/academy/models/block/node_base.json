@@ -1,1 +1,12 @@
-{"__xconfgen":true,"parent":"block/cube","textures":{"down":"#vert","east":"#side","north":"#side","particle":"#side","south":"#side","up":"#vert","west":"#side"}}
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "#side",
+    "down": "#vert",
+    "up": "#vert",
+    "north": "#side",
+    "south": "#side",
+    "east": "#side",
+    "west": "#side"
+  }
+}

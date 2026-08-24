@@ -1,215 +1,209 @@
 package cn.academy.util;
 
 import cn.academy.ability.AbilityContext;
+import cn.academy.ability.AbilityPipeline;
 import cn.academy.event.BlockDestroyEvent;
-import cn.lambdalib2.util.*;
-import net.minecraft.block.Block;
-import net.minecraft.block.SoundType;
-import net.minecraft.block.material.Material;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.audio.ISound;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.SoundEvent;
-import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import cn.lambdalib2.util.MathUtils;
+import cn.lambdalib2.util.RandUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import static cn.lambdalib2.util.VecUtils.add;
-import static cn.lambdalib2.util.VecUtils.multiply;
-import static cn.lambdalib2.util.VecUtils.subtract;
-
-/**
- * A super boomy ranged ray damage. it starts out a ranged ray in the given position and direction,
- *     and destroy blocks in the path, also damages entities. It takes account of global damage switches.
- * @author WeAthFolD
- */
 public class RangedRayDamage {
-    
-    static final double STEP = 0.9;
 
-    public final EntityPlayer player;
-    public final World world;
-    public EntityLook look;
-    public Vec3d pos, dir;
+    static final double DISK_STEP = 0.5;
+
+    public final Player player;
+    public final Level world;
+    public Vec3 pos, dir;
     public final AbilityContext ctx;
 
-
     public double range;
-    public float totalEnergy; // decrements [hardness of block] when hit a block
+
+    public float totalEnergy;
     public int maxIncrement = 50;
     public float dropProb = 0.05f;
-    
-    public Predicate<Entity> entitySelector = EntitySelectors.everything();
-    public float startDamage = 10.0f; // ATTN: LINEAR 1.0*startDamage at dist 0; 0.2 * startDamage at maxIncrement
-    
-    private Vec3d start, slope;
-    
-    public RangedRayDamage(AbilityContext ctx, double _range, float _energy) {
+
+    public Predicate<Entity> entitySelector = e -> true;
+
+    public float startDamage = 10.0f;
+
+    public boolean carveBlocks = true;
+
+    public double scanDepth = -1;
+
+    public double minAlong = Double.NEGATIVE_INFINITY;
+
+    public float energyLeft;
+
+    public Predicate<Entity> shouldHit = e -> true;
+
+    public Predicate<Entity> blocksBeam = e -> false;
+
+    public Consumer<Entity> onHit = e -> {};
+
+    private Vec3 start, slope;
+
+    public RangedRayDamage(AbilityContext ctx, double range, float energy) {
         this.ctx = ctx;
-
-        pos = ctx.player.getPositionVector();
-        look = new EntityLook(ctx.player);
-        dir = look.toVec3();
-
+        this.pos = ctx.player.position();
+        this.dir = ctx.player.getLookAngle();
         this.player = ctx.player;
-        this.world = ctx.player.world;
-        this.range = _range;
-        this.totalEnergy = _energy;
-
-        entitySelector = EntitySelectors.exclude(ctx.player);
+        this.world = ctx.player.level();
+        this.range = range;
+        this.totalEnergy = energy;
     }
-    
-    /**
-     * BOOM!
-     */
+
+    private double depth() {
+        return scanDepth > 0 ? Math.min(scanDepth, maxIncrement) : maxIncrement;
+    }
+
     public void perform() {
-        Set<int[]> processed = new HashSet<>();
-        
-        float yaw = -MathUtils.PI_F * 0.5f - look.yaw,
-                pitch = look.pitch;
-        
+        Set<BlockPos> processed = new HashSet<>();
+
+        energyLeft = totalEnergy;
         start = pos;
         slope = dir;
-        
-        Vec3d vp0 = new Vec3d(0, 0, 1);
-        vp0.rotatePitch(pitch);
-        vp0.rotateYaw(yaw);
-        
-        Vec3d vp1 = new Vec3d(0, 1, 0);
-        vp1.rotatePitch(pitch);
-        vp1.rotateYaw(yaw);
+
+        Vec3 up = Math.abs(slope.y) > 0.99 ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
+        final Vec3 vp0 = slope.cross(up).normalize();
+        final Vec3 vp1 = slope.cross(vp0).normalize();
 
         double maxDistance = Double.MAX_VALUE;
-        
-        /* Apply Entity Damage */ {
-            Vec3d v0 = add(start, add(multiply(vp0, -range), multiply(vp1, -range))),
-                    v1 = add(start, add(multiply(vp0, range), multiply(vp1, -range))),
-                    v2 = add(start, add(multiply(vp0, range), multiply(vp1, range))),
-                    v3 = add(start, add(multiply(vp0, -range), multiply(vp1, range))),
-                    v4 = add(v0, multiply(slope, maxIncrement)),
-                    v5 = add(v1, multiply(slope, maxIncrement)),
-                    v6 = add(v2, multiply(slope, maxIncrement)),
-                    v7 = add(v3, multiply(slope, maxIncrement));
-            AxisAlignedBB aabb = WorldUtils.minimumBounds(v0, v1, v2, v3, v4, v5, v6, v7);
+
+        {
+            Vec3 v0 = start.add(vp0.scale(-range)).add(vp1.scale(-range));
+            Vec3 v1 = start.add(vp0.scale(range)).add(vp1.scale(-range));
+            Vec3 v2 = start.add(vp0.scale(range)).add(vp1.scale(range));
+            Vec3 v3 = start.add(vp0.scale(-range)).add(vp1.scale(range));
+            double scan = depth();
+            Vec3 v4 = v0.add(slope.scale(scan));
+            Vec3 v5 = v1.add(slope.scale(scan));
+            Vec3 v6 = v2.add(slope.scale(scan));
+            Vec3 v7 = v3.add(slope.scale(scan));
+            AABB aabb = minimumBounds(v0, v1, v2, v3, v4, v5, v6, v7);
 
             Predicate<Entity> areaSelector = target -> {
-                Vec3d dv = subtract(new Vec3d(target.posX, target.posY, target.posZ), start);
-                Vec3d proj = dv.crossProduct(slope);
-                return proj.length() < range * 1.2;
+                Vec3 dv = target.position().subtract(start);
+                if (dv.dot(slope) < minAlong) {
+                    return false;
+                }
+                return dv.cross(slope).length() < range * 1.2;
             };
-            List<Entity> targets = WorldUtils.getEntities(world, aabb, entitySelector.and(areaSelector));
-            targets.sort((lhs, rhs) -> {
-                double dist1 = ctx.player.getDistanceSq(lhs.posX, lhs.posY, lhs.posZ);
-                double dist2 = ctx.player.getDistanceSq(rhs.posX, rhs.posY, rhs.posZ);
-                return Double.valueOf(dist1).compareTo(dist2);
-            });
 
-            for(Entity e : targets) {
+            List<Entity> targets = new ArrayList<>(
+                    world.getEntities(player, aabb, entitySelector.and(areaSelector)
+                            .and(t -> AbilityPipeline.canTarget(player, t))));
+
+            targets.sort((lhs, rhs) -> Double.compare(
+                    player.distanceToSqr(lhs.position()), player.distanceToSqr(rhs.position())));
+
+            for (Entity e : targets) {
+                if (!shouldHit.test(e)) {
+
+                    if (blocksBeam.test(e)) {
+                        maxDistance = e.distanceToSqr(player.position());
+                        break;
+                    }
+                    continue;
+                }
                 if (!attackEntity(e)) {
-                    maxDistance = e.getDistanceSq(ctx.player);
+                    maxDistance = e.distanceToSqr(player.position());
                     break;
                 }
+                onHit.accept(e);
             }
         }
 
-        if(ctx.canBreakBlock(world)) {
-            for(double s = -range; s <= range; s += STEP) {
-                for(double t = -range; t <= range; t += STEP) {
-                    double rr = range * RandUtils.ranged(0.9, 1.1);
+        if (carveBlocks && ctx.canBreakBlock(world)) {
+            float energy = totalEnergy;
+            int maxDepth = (int) Math.min(depth(), Math.sqrt(maxDistance));
 
-                    if(s * s + t * t > rr * rr)
-                        continue;
-                    
-                    Vec3d pos = add(start,
-                        add(
-                            multiply(vp0, s),
-                            multiply(vp1, t)));
-                    
-                    //int[] coords = { (int) pos.x, (int) pos.y, (int) pos.z };
-                    int[] coords = { (int)Math.floor( pos.x), (int)Math.floor( pos.y), (int)Math.floor( pos.z)};
-                    if(processed.contains(coords))
-                        continue;
-                    
-                    processed.add(coords);
+            depth:
+            for (int d = 0; d <= maxDepth && energy > 0; d++) {
+                Vec3 center = start.add(slope.scale(d));
+                boolean snd = d < 20;
+                for (double s = -range; s <= range + 1e-9; s += DISK_STEP) {
+                    for (double t = -range; t <= range + 1e-9; t += DISK_STEP) {
+                        if (s * s + t * t > range * range) continue;
+
+                        Vec3 p = center.add(vp0.scale(s)).add(vp1.scale(t));
+
+                        BlockPos bp = new BlockPos(
+                                (int) Math.floor(p.x), (int) Math.floor(p.y), (int) Math.floor(p.z));
+                        if (!processed.add(bp)) continue;
+
+                        float cost = tryDestroy(bp, snd, energy);
+                        if (cost < 0) continue;
+                        energy -= cost;
+                        if (energy <= 0) break depth;
+
+                        if (RandUtils.ranged(0, 1) < 0.05) {
+                            Direction dd = Direction.values()[RandUtils.rangei(0, 6)];
+                            float c2 = tryDestroy(bp.relative(dd), snd, energy);
+                            if (c2 >= 0) energy -= c2;
+                        }
+                    }
                 }
             }
-            
-            float ave = totalEnergy / processed.size();
-            for(int[] coords : processed) {
-                processLine(coords[0], coords[1], coords[2], 
-                    slope, ave * RandUtils.rangef(0.95f, 1.05f), maxDistance);
-            }
-        }
-        
-
-    }
-    
-    private void processLine(int x0, int y0, int z0, Vec3d slope, float energy, double maxDistSq) {
-        Plotter plotter = new Plotter(x0, y0, z0, slope.x, slope.y, slope.z);
-        int incrs = 0;
-        for(int i = 0; i <= maxIncrement && energy > 0; ++i) {
-            ++incrs;
-            int[] coords = plotter.next();
-            int x = coords[0], y = coords[1], z = coords[2];
-            BlockPos pos = new BlockPos(x, y, z);
-
-            int dx = x0 - x, dy = y0 - y, dz = z0 - z;
-            int dsq = dx*dx + dy*dy + dz*dz;
-            if (dsq > maxDistSq) break;
-
-            boolean snd = incrs < 20;
-            
-            energy = destroyBlock(energy, pos, snd);
-            
-            if(RandUtils.ranged(0, 1) < 0.05) {
-                EnumFacing dir = EnumFacing.values()[RandUtils.rangei(0, 6)];
-                energy = destroyBlock(energy, pos.offset(dir), snd);
-            }
+            energyLeft = Math.max(0, energy);
         }
     }
-    
-    private float destroyBlock(float energy, BlockPos pos, boolean snd) {
-        IBlockState blockState = world.getBlockState(pos);
-        Block block = blockState.getBlock();
-        float hardness = block.getBlockHardness(blockState, world, pos);
-        if(hardness < 0)
-            hardness = 233333;
-        if(!MinecraftForge.EVENT_BUS.post(new BlockDestroyEvent(player, pos)) && energy >= hardness) {
-            if(block.getMaterial(blockState) != Material.AIR) {
-                block.dropBlockAsItemWithChance(world, pos, blockState, dropProb, 0);
 
-                if(snd && RandUtils.ranged(0, 1) < 0.1) {
-                    SoundType st = block.getSoundType(blockState, world, pos, player);
-                    SoundEvent breakSnd = st.getBreakSound();
-                    world.playSound(
-                        pos.getX() + 0.5F, pos.getY() + 0.5F, pos.getZ() + 0.5F,
-                        breakSnd,
-                        SoundCategory.BLOCKS,
-                        (st.getVolume() + 1.0F) / 2.0F,
-                        st.getPitch(), false);
-                }
-            }
-            world.setBlockToAir(pos);
-            return energy - hardness;
+    private static AABB minimumBounds(Vec3... pts) {
+        double x0 = Double.MAX_VALUE, y0 = Double.MAX_VALUE, z0 = Double.MAX_VALUE;
+        double x1 = -Double.MAX_VALUE, y1 = -Double.MAX_VALUE, z1 = -Double.MAX_VALUE;
+        for (Vec3 p : pts) {
+            x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); z0 = Math.min(z0, p.z);
+            x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); z1 = Math.max(z1, p.z);
         }
-        return 0;
+        return new AABB(x0, y0, z0, x1, y1, z1);
+    }
+
+    private float tryDestroy(BlockPos pos, boolean snd, float energy) {
+        BlockState state = world.getBlockState(pos);
+        float hardness = state.getDestroySpeed(world, pos);
+        if (hardness < 0) return -1;
+        if (energy < hardness) return -1;
+        if (MinecraftForge.EVENT_BUS.post(new BlockDestroyEvent(player, pos))) return -1;
+
+        if (!state.isAir()) {
+
+            if (world instanceof net.minecraft.server.level.ServerLevel sl
+                    && RandUtils.ranged(0, 1) < dropProb) {
+                Block.dropResources(state, sl, pos, world.getBlockEntity(pos), player, player.getMainHandItem());
+            }
+            if (snd && RandUtils.ranged(0, 1) < 0.1) {
+                SoundType st = state.getSoundType(world, pos, player);
+                world.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                        st.getBreakSound(), SoundSource.BLOCKS,
+                        (st.getVolume() + 1.0F) / 2.0F, st.getPitch());
+            }
+        }
+        world.removeBlock(pos, false);
+        return hardness;
     }
 
     protected boolean attackEntity(Entity target) {
-        Vec3d dv = subtract(new Vec3d(target.posX, target.posY, target.posZ), start);
-        float dist = Math.min(maxIncrement, (float) dv.crossProduct(slope).length());
-        
+        Vec3 dv = target.position().subtract(start);
+
+        float dist = (float) Math.min(maxIncrement, dv.cross(slope).length());
         float realDmg = this.startDamage * MathUtils.lerpf(1, 0.2f, dist / maxIncrement);
         return applyAttack(target, realDmg);
     }
@@ -221,24 +215,36 @@ public class RangedRayDamage {
 
     public static class Reflectible extends RangedRayDamage {
 
-        public final Consumer<Entity> callback;
+        public final java.util.function.BiConsumer<Entity, cn.academy.event.ability.ReflectEvent> callback;
 
-        public Reflectible(AbilityContext ctx,
-                           double _range, float _energy, Consumer<Entity> callback) {
-            super(ctx, _range, _energy);
+        public Vec3 beamOrigin;
+
+        public double standoff = RayReflect.DEFAULT_STANDOFF;
+
+        public long extendMs = RayReflect.DEFAULT_EXTEND_MS;
+
+        public double beamLength = 0;
+
+        public Reflectible(AbilityContext ctx, double range, float energy,
+                           java.util.function.BiConsumer<Entity, cn.academy.event.ability.ReflectEvent> callback) {
+            super(ctx, range, energy);
             this.callback = callback;
+            this.beamOrigin = ctx.player.getEyePosition(1.0f);
         }
 
         @Override
         protected boolean applyAttack(Entity target, float damage) {
-            boolean[] result = new boolean[] { true }; // for lambda modification
-            ctx.attackReflect(target, damage, () -> {
-                callback.accept(target);
+            boolean[] result = {true};
+            ctx.attackReflect(target, damage, this::fillContext, event -> {
+                callback.accept(target, event);
                 result[0] = false;
             });
             return result[0];
         }
 
+        private void fillContext(cn.academy.event.ability.ReflectEvent event) {
+            RayReflect.fill(event, beamOrigin, dir, event.target, standoff, extendMs);
+            event.beamLength = beamLength;
+        }
     }
-
 }

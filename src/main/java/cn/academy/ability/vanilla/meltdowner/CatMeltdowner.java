@@ -1,80 +1,78 @@
 package cn.academy.ability.vanilla.meltdowner;
 
 import cn.academy.ability.Category;
-import cn.academy.ability.Skill;
+import cn.academy.ability.CategoryManager;
 import cn.academy.ability.vanilla.VanillaCategories;
-import cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify$;
-import cn.academy.ability.vanilla.meltdowner.skill.*;
+import cn.academy.ability.vanilla.meltdowner.skill.ElectronBomb;
 
-/**
- * @author WeAthFolD
- */
-public class CatMeltdowner extends Category {
+public final class CatMeltdowner {
 
-    public static final Skill
-        electronBomb = ElectronBomb.Instance,
-        radIntensify = RadiationIntensify$.MODULE$,
-        rayBarrage = RayBarrage$.MODULE$,
-        scatterBomb = ScatterBomb$.MODULE$,
-        lightShield = LightShield.INSTANCE,
-        meltdowner = Meltdowner$.MODULE$,
-        jetEngine = JetEngine$.MODULE$,
-        mineRayBasic = MineRayBasic$.MODULE$,
-        mineRayExpert = MineRayExpert$.MODULE$,
-        mineRayLuck = MineRayLuck$.MODULE$,
-        electronMissile = ElectronMissile$.MODULE$;
+    public static final Category CATEGORY = new Category("meltdowner");
 
-    public CatMeltdowner() {
-        super("meltdowner");
-        setColorStyle(126, 255, 132, 80);
+    private CatMeltdowner() {}
 
-        electronBomb.setPosition(15, 45);
-        radIntensify.setPosition(35, 75);
-        scatterBomb.setPosition(70, 50);
-        lightShield.setPosition(55, 15);
-        meltdowner.setPosition(115, 40);
-        mineRayBasic.setPosition(140, 70);
-        rayBarrage.setPosition(140, 10);
-        jetEngine.setPosition(170, 32);
-        mineRayExpert.setPosition(172, 70);
-        mineRayLuck.setPosition(205, 82);
-        electronMissile.setPosition(210, 35);
+    public static void register() {
 
-        // Lv1
-        this.addSkill(electronBomb);
-        this.addSkill(radIntensify);
+        CATEGORY.setColorStyle(126, 255, 132, 80);
 
-        // Lv2
-        this.addSkill(scatterBomb);
-        this.addSkill(lightShield);
+        ElectronBomb.INSTANCE.setPosition(15, 45);
 
-        // Lv3
-        this.addSkill(meltdowner);
-        this.addSkill(mineRayBasic);
+        CATEGORY.addSkill(ElectronBomb.INSTANCE);
 
-        // Lv4
-        this.addSkill(rayBarrage);
-        this.addSkill(jetEngine);
-        this.addSkill(mineRayExpert);
+        VanillaCategories.addGenericSkills(CATEGORY);
 
-        // Lv5
-        this.addSkill(mineRayLuck);
-        this.addSkill(electronMissile);
+        cn.academy.ability.vanilla.meltdowner.skill.LightShield.INSTANCE.setPosition(55, 15);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.skill.LightShield.INSTANCE);
 
-        VanillaCategories.addGenericSkills(this);
+        cn.academy.ability.vanilla.meltdowner.skill.LightShield.INSTANCE
+                .setParent(ElectronBomb.INSTANCE, 1.0f);
 
-        // Deps
-        scatterBomb.setParent(electronBomb, 0.8f);
-        radIntensify.setParent(electronBomb, 0.5f);
-        lightShield.setParent(electronBomb, 1.0f);
-        meltdowner.setParent(scatterBomb, 0.8f);
-        meltdowner.addSkillDep(lightShield, 0.8f);
-        mineRayBasic.setParent(meltdowner, 0.3f);
-        rayBarrage.setParent(meltdowner, 0.5f);
-        jetEngine.setParent(meltdowner, 1.0f);
-        mineRayExpert.setParent(mineRayBasic, 0.8f);
-        mineRayLuck.setParent(mineRayExpert, 1.0f);
-        electronMissile.setParent(jetEngine, 0.3f);
+        cn.academy.ability.vanilla.meltdowner.skill.LightShield.init();
+
+        cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify.INSTANCE.setPosition(35, 75);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify.INSTANCE);
+        cn.academy.ability.vanilla.meltdowner.passiveskill.RadiationIntensify.INSTANCE
+                .setParent(ElectronBomb.INSTANCE, 0.5f);
+
+        cn.academy.ability.vanilla.meltdowner.skill.MDDamageHelper.init();
+
+        cn.academy.ability.vanilla.meltdowner.skill.MdBeam.init();
+
+        cn.academy.ability.vanilla.meltdowner.skill.ScatterBomb.INSTANCE.setPosition(70, 50);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.skill.ScatterBomb.INSTANCE);
+        cn.academy.ability.vanilla.meltdowner.skill.ScatterBomb.INSTANCE
+                .setParent(ElectronBomb.INSTANCE, 0.8f);
+
+        cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE.setPosition(115, 40);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE);
+        cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE
+                .setParent(cn.academy.ability.vanilla.meltdowner.skill.ScatterBomb.INSTANCE, 0.8f);
+        cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE
+                .addSkillDep(cn.academy.ability.vanilla.meltdowner.skill.LightShield.INSTANCE, 0.8f);
+
+        cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.init();
+
+        cn.academy.ability.vanilla.meltdowner.passiveskill.RayBarrage.INSTANCE.setPosition(140, 10);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.passiveskill.RayBarrage.INSTANCE);
+        cn.academy.ability.vanilla.meltdowner.passiveskill.RayBarrage.INSTANCE
+                .setParent(cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE, 0.5f);
+
+        cn.academy.ability.vanilla.meltdowner.passiveskill.RayBarrage.init();
+
+        cn.academy.ability.vanilla.meltdowner.skill.JetEngine.INSTANCE.setPosition(170, 32);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.skill.JetEngine.INSTANCE);
+
+        cn.academy.ability.vanilla.meltdowner.skill.JetEngine.INSTANCE
+                .setParent(cn.academy.ability.vanilla.meltdowner.skill.Meltdowner.INSTANCE, 1.0f);
+
+        cn.academy.ability.vanilla.meltdowner.skill.ElectronMissile.INSTANCE.setPosition(210, 35);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.meltdowner.skill.ElectronMissile.INSTANCE);
+
+        cn.academy.ability.vanilla.meltdowner.skill.ElectronMissile.INSTANCE
+                .setParent(cn.academy.ability.vanilla.meltdowner.skill.JetEngine.INSTANCE, 0.3f);
+
+        CategoryManager.INSTANCE.register(CATEGORY);
+
+        VanillaCategories.addLateGenericSkills(CATEGORY);
     }
-
 }

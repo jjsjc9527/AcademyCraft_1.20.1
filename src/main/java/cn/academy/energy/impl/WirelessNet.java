@@ -6,30 +6,25 @@ import cn.academy.energy.api.block.IWirelessNode;
 import cn.academy.energy.impl.VBlocks.VWMatrix;
 import cn.academy.energy.impl.VBlocks.VWNode;
 import cn.lambdalib2.util.MathUtils;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.world.World;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-//import cn.lambdalib2.util.MathUtils;
-
-/**
- * @author WeAthFolD
- */
 public class WirelessNet {
 
     private static final int UPDATE_INTERVAL = 40;
     private static final double BUFFER_MAX = 2000;
 
     private final WiWorldData data;
-    World world;
+    Level world;
 
     private List<VWNode> nodes = new LinkedList<>();
-
     private List<VWNode> toRemoveNodes = new ArrayList<>();
 
     private VWMatrix matrix;
@@ -45,49 +40,42 @@ public class WirelessNet {
 
     WirelessNet(WiWorldData data, VWMatrix matrix, String ssid, String pass) {
         this.data = data;
-
         this.matrix = matrix;
-
         this.ssid = ssid;
         this.password = pass;
     }
 
-    WirelessNet(WiWorldData data, NBTTagCompound tag) {
+    WirelessNet(WiWorldData data, CompoundTag tag) {
         this.data = data;
 
-        //Load the matrix
-        matrix = new VWMatrix(tag.getCompoundTag("matrix"));
+        matrix = new VWMatrix(tag.getCompound("matrix"));
 
-        //Load the info
         ssid = tag.getString("ssid");
         password = tag.getString("password");
         buffer = tag.getDouble("buffer");
 
-        //Load the node list
-        NBTTagList list = (NBTTagList) tag.getTag("list");
-        for (int i = 0; i < list.tagCount(); ++i) {
-            doAddNode(new VWNode(list.getCompoundTagAt(i)));
+        ListTag list = tag.getList("list", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); ++i) {
+            doAddNode(new VWNode(list.getCompound(i)));
         }
 
-        debug("Loading " + ssid + " from NBT, " + list.tagCount() + " nodes.");
+        debug("Loading " + ssid + " from NBT, " + list.size() + " nodes.");
     }
 
-    NBTTagCompound toNBT() {
-        NBTTagCompound tag = new NBTTagCompound();
-        tag.setTag("matrix", matrix.toNBT());
-        tag.setString("ssid", ssid);
-        tag.setString("password", password);
-        tag.setDouble("buffer", buffer);
+    CompoundTag toNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.put("matrix", matrix.toNBT());
+        tag.putString("ssid", ssid);
+        tag.putString("password", password);
+        tag.putDouble("buffer", buffer);
 
-        NBTTagList list = new NBTTagList();
+        ListTag list = new ListTag();
         for (VWNode vn : nodes) {
             if (!vn.isLoaded(world) || vn.get(world) != null) {
-                list.appendTag(vn.toNBT());
+                list.add(vn.toNBT());
             }
         }
-        tag.setTag("list", list);
-
-        debug(ssid + " toNBT()");
+        tag.put("list", list);
 
         return tag;
     }
@@ -118,7 +106,7 @@ public class WirelessNet {
     }
 
     public int getCapacity() {
-        World world = data.world;
+        Level world = data.world;
         IWirelessMatrix imat = matrix.get(world);
         return imat == null ? 0 : imat.getCapacity();
     }
@@ -127,9 +115,6 @@ public class WirelessNet {
         return matrix.get(world);
     }
 
-    /**
-     * Dispose (a.k.a. destroy) this network and unlink all its linked nodes.
-     */
     void dispose() {
         disposed = true;
     }
@@ -151,7 +136,6 @@ public class WirelessNet {
 
         WiWorldData data = getWorldData();
 
-        //Check if this node is previously added
         WirelessNet other = data.getNetwork(node.get(world));
         if (other != null) {
             other.removeNode(node);
@@ -184,7 +168,6 @@ public class WirelessNet {
     }
 
     private void doAddNode(VWNode node) {
-        //Really add
         WiWorldData data = getWorldData();
         nodes.add(node);
         data.netLookup.put(node, this);
@@ -200,11 +183,11 @@ public class WirelessNet {
     }
 
     void onCleanup(WiWorldData data) {
-        data.netLookup.remove(ssid);
-        data.netLookup.remove(matrix);
+
+        data.netLookup.remove(matrix, this);
 
         for (VWNode n : nodes) {
-            data.netLookup.remove(n);
+            data.netLookup.remove(n, this);
         }
     }
 
@@ -216,15 +199,12 @@ public class WirelessNet {
         validate();
 
         if (matrix.isLoaded(world)) {
-            // Check whether the matrix is valid. The matrix is ALWAYS loaded.
             IWirelessMatrix imat = matrix.get(world);
             if (imat == null) {
-                debug("WirelessNet with SSID " + ssid + " matrix destoryed, removing");
+                debug("WirelessNet with SSID " + ssid + " matrix destroyed, removing");
                 dispose();
             } else {
-                // Balance.
-                // Shuffle in order to not balance one node all the time
-                // Maybe a bit of slow?
+
                 Collections.shuffle(nodes);
 
                 double sum = 0, maxSum = 0;
@@ -240,14 +220,12 @@ public class WirelessNet {
                     }
                 }
 
-                // Remove nodes
                 data.netLookup.keySet().removeAll(toRemoveNodes);
                 nodes.removeAll(toRemoveNodes);
                 toRemoveNodes.clear();
 
                 double percent = sum / maxSum;
                 double transferLeft = imat.getBandwidth();
-                // Loop through and calc
                 for (VWNode vn : nodes) {
                     if (vn.isLoaded(world)) {
                         IWirelessNode node = vn.get(world);
@@ -278,7 +256,6 @@ public class WirelessNet {
 
     private void debug(Object msg) {
         if (AcademyCraft.DEBUG_MODE)
-            AcademyCraft.log.info("WN:" + msg);
+            AcademyCraft.LOGGER.info("WN:" + msg);
     }
-
 }

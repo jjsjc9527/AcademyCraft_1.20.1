@@ -1,28 +1,25 @@
 package cn.academy.datapart;
 
+import cn.academy.config.AbilityConfig;
 import cn.academy.event.ability.*;
 import cn.academy.event.ability.CalcEvent.CPRecoverSpeed;
 import cn.academy.event.ability.CalcEvent.OverloadRecoverSpeed;
-import cn.academy.ACConfig;
-import cn.lambdalib2.registry.mc.RegEventHandler;
-import cn.lambdalib2.s11n.SerializeIncluded;
-import cn.lambdalib2.s11n.nbt.NBTS11n;
-import cn.lambdalib2.s11n.network.NetworkMessage;
-import cn.lambdalib2.s11n.network.NetworkMessage.Listener;
 import cn.lambdalib2.datapart.DataPart;
 import cn.lambdalib2.datapart.EntityData;
 import cn.lambdalib2.datapart.RegDataPart;
+import cn.lambdalib2.s11n.network.NetworkMessage;
+import cn.lambdalib2.s11n.network.NetworkMessage.Listener;
 import cn.lambdalib2.util.MathUtils;
 import com.google.common.base.Preconditions;
-import com.typesafe.config.Config;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerWakeUpEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.LogicalSide;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.HashMap;
@@ -30,15 +27,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
-/**
- * CP but more than CP. CPData stores rather dynamic part of player ability data,
- *     for example, whether the player is using ability, current CP and overload, etc.
- * @author WeAthFolD
- */
-@RegDataPart(EntityPlayer.class)
-public class CPData extends DataPart<EntityPlayer> {
+@RegDataPart(Player.class)
+public class CPData extends DataPart<Player> {
 
-    private Config config;
     private AbilityData abilityData;
 
     private static final String
@@ -46,47 +37,43 @@ public class CPData extends DataPart<EntityPlayer> {
         MSG_ACTIVATE_SVR = "actv_svr";
 
     public interface IInterfSource {
-        /**
-         * @return Whether the inteference should still be applied. If not the interferer will be removed.
-         */
+
         boolean interfering();
     }
 
-    private Map<String, IInterfSource> interfSources = new HashMap<>();
+    private final Map<String, IInterfSource> interfSources = new HashMap<>();
 
-    @SerializeIncluded
     private boolean activated = false;
 
-    @SerializeIncluded
     private float curCP;
 
-    @SerializeIncluded
     private float maxCP = 100.0f;
-    @SerializeIncluded
-    private float addMaxCP = 0.0f; // The CP added out of ability usage.
+    private float addMaxCP = 0.0f;
 
-    @SerializeIncluded
+    private float extraMaxCpRate = 0.0f;
+
+    private float maxCpMultiplier = 1.0f;
+
+    private boolean lifeGuarded = false;
+
+    private int consumeSeq = 0;
+
+    public int getConsumeSeq() {
+        return consumeSeq;
+    }
+
+    private boolean lifeTakenOver = false;
+
     private float curOverload;
 
-    @SerializeIncluded
     private float maxOverload = 100.0f;
-    @SerializeIncluded
-    private float addMaxOverload = 0.0f; // The Overload added out of ability usage.
+    private float addMaxOverload = 0.0f;
 
-    @SerializeIncluded
     private boolean overloadFine = true;
-    @SerializeIncluded
-    private boolean interfering = false; // Cached value
+    private boolean interfering = false;
 
-    /**
-     * Tick counter for cp recover.
-     */
-    @SerializeIncluded
     private int untilRecover;
-    /**
-     * Tick conter for overload recover.
-     */
-    @SerializeIncluded
+
     private int untilOverloadRecover;
 
     private boolean dataDirty = false;
@@ -99,13 +86,12 @@ public class CPData extends DataPart<EntityPlayer> {
         setNBTStorage();
     }
 
-    public static CPData get(EntityPlayer player) {
+    public static CPData get(Player player) {
         return EntityData.get(player).getPart(CPData.class);
     }
 
     @Override
     public void wake() {
-        config = ACConfig.instance().getConfig("ac.ability.data");
         abilityData = AbilityData.get(getEntity());
     }
 
@@ -115,21 +101,21 @@ public class CPData extends DataPart<EntityPlayer> {
 
         boolean remote = isClient();
 
-        if(aData.hasCategory()) {
-            if(untilRecover == 0) {
+        if (aData.hasCategory()) {
+            if (untilRecover == 0) {
                 float recover = getCPRecoverSpeed();
                 curCP += recover;
-                if(curCP > getMaxCP())
+                if (curCP > getMaxCP())
                     curCP = getMaxCP();
             } else {
                 untilRecover--;
             }
 
-            if(untilOverloadRecover == 0) {
+            if (untilOverloadRecover == 0) {
                 float recover = getOverloadRecoverSpeed();
 
                 curOverload -= recover;
-                if(curOverload <= 0) {
+                if (curOverload <= 0) {
                     overloadFine = true;
                     curOverload = 0;
                 }
@@ -137,7 +123,6 @@ public class CPData extends DataPart<EntityPlayer> {
                 untilOverloadRecover--;
             }
 
-            // Update interefering
             if (!remote) {
                 Iterator<Entry<String, IInterfSource>> iter = interfSources.entrySet().iterator();
                 while (iter.hasNext()) {
@@ -155,12 +140,11 @@ public class CPData extends DataPart<EntityPlayer> {
                 interfering = newInterf;
             }
 
-            // Do the sync.
-            if(!remote) {
+            if (!remote) {
                 int interval = (activated ? 1 : 3) * (dataDirty ? 4 : 10);
 
                 ++tickSync;
-                if(tickSync >= interval) {
+                if (tickSync >= interval) {
                     dataDirty = false;
                     tickSync = 0;
                     sync();
@@ -170,42 +154,103 @@ public class CPData extends DataPart<EntityPlayer> {
     }
 
     public boolean isActivated() {
-        // At initialization stage, it's possible that activated become true, but AbilityData isn't
-        //  yet synchronized, so additional check is required.
+
         return abilityData.hasCategory() && activated;
     }
 
-    /**
-     * @return Whether the player can use ability currently.
-     *     e.g. whether the skills can be executed by pressing ability keys.
-     */
     public boolean canUseAbility() {
         return activated && overloadFine && !interfering;
     }
 
-    /**
-     * Sets the ability active state. Available in both client and server. In client syncs to server internally.
-     */
+    @Deprecated
     public void setActivateState(boolean state) {
+        setActivateState(state, AbilityToggleSource.UNKNOWN);
+    }
+
+    public void setActivateState(boolean state, AbilityToggleSource source) {
+
+        if (!state && !source.authorized()) {
+            refuseDeactivate();
+            return;
+        }
+
+        if (!state) {
+            try {
+                if (cn.academy.util.ACDiag.ON)
+                org.apache.logging.log4j.LogManager.getLogger("AcademyCraft/CPData").warn(
+                        "[ability-off] {} side | ability of {} was switched off | source={}\nstack:\n{}",
+                        isClient() ? "client" : "server",
+                        getEntity().getName().getString(), source,
+                        StackWalker.getInstance().walk(s -> s.limit(20)
+                                .map(f -> "    " + f.getClassName() + "." + f.getMethodName())
+                                .reduce("", (a, b) -> a.isEmpty() ? b : a + "\n" + b)));
+            } catch (Throwable ignored) {
+
+            }
+        }
+
         if (isClient()) {
-            activated = state; // Set client state in advance to prevent display lag
-            NetworkMessage.sendToServer(this, MSG_ACTIVATE_SVR, state);
+            activated = state;
+            NetworkMessage.sendToServer(this, MSG_ACTIVATE_SVR, state, source.ordinal());
         } else {
             Preconditions.checkState(!state || AbilityData.get(getEntity()).hasCategory(),
                     "Trying to activate ability when player doesn't have one");
 
             if (activated != state) {
+
                 activated = state;
-                NetworkMessage.sendToSelf(this, MSG_POST_EVENT, activated);
-                NetworkMessage.sendTo(getEntity(), this, MSG_POST_EVENT, activated);
+                postEvent(activated);
+                sendToLocal(MSG_POST_EVENT, activated);
             }
 
             markDirty();
         }
     }
 
+    private static final org.apache.logging.log4j.Logger LOG =
+            org.apache.logging.log4j.LogManager.getLogger("AcademyCraft/CPData");
+
+    private static final Map<String, Long> REFUSE_LOG_AT = new HashMap<>();
+
+    private static final long REFUSE_LOG_INTERVAL_MS = 10_000L;
+
+    private static final int REFUSE_LOG_MAX = 64;
+
+    private void refuseDeactivate() {
+        String caller = academy$callerOutsideCPData();
+        String who = getEntity() == null ? "?" : getEntity().getGameProfile().getName();
+        String key = who + "|" + caller;
+
+        long now = System.currentTimeMillis();
+        Long last = REFUSE_LOG_AT.get(key);
+        if (last != null && now - last < REFUSE_LOG_INTERVAL_MS) {
+            return;
+        }
+        if (REFUSE_LOG_AT.size() > REFUSE_LOG_MAX) {
+            REFUSE_LOG_AT.clear();
+        }
+        REFUSE_LOG_AT.put(key, now);
+
+        LOG.warn("blocked an unauthorized ability shutdown: player={} caller={} -- "
+                        + "if this is our own code, use setActivateState(state, AbilityToggleSource.XXX) to declare the source.",
+                who, caller);
+    }
+
+    private static String academy$callerOutsideCPData() {
+        StackTraceElement[] st = Thread.currentThread().getStackTrace();
+        String self = CPData.class.getName();
+        for (StackTraceElement e : st) {
+            String cls = e.getClassName();
+            if (cls.equals(self) || cls.equals(Thread.class.getName())) {
+                continue;
+            }
+            return cls + "." + e.getMethodName() + ":" + e.getLineNumber();
+        }
+        return "<unknown>";
+    }
+
     public void setCP(float cp) {
-        curCP = MathUtils.clampf(0, maxCP, cp);
+        curCP = MathUtils.clampf(0, getMaxCP(), cp);
 
         markDirty();
     }
@@ -217,7 +262,7 @@ public class CPData extends DataPart<EntityPlayer> {
     }
 
     private void markDirty() {
-        if(!isClient()) {
+        if (!isClient()) {
             dataDirty = true;
         }
     }
@@ -227,11 +272,61 @@ public class CPData extends DataPart<EntityPlayer> {
     }
 
     public float getMaxCP() {
-        return maxCP + addMaxCP;
+        return (maxCP + addMaxCP) * (1.0f + extraMaxCpRate) * maxCpMultiplier;
     }
 
     public float getRawMaxCP() {
         return maxCP;
+    }
+
+    public boolean isLifeTakenOver() {
+        return lifeTakenOver;
+    }
+
+    public void setLifeTakenOver(boolean value) {
+        if (value == lifeTakenOver) {
+            return;
+        }
+        lifeTakenOver = value;
+        markDirty();
+    }
+
+    public boolean isLifeGuarded() {
+        return lifeGuarded;
+    }
+
+    public void setLifeGuarded(boolean value) {
+        if (value == lifeGuarded) {
+            return;
+        }
+        lifeGuarded = value;
+        markDirty();
+    }
+
+    public float getExtraMaxCpRate() {
+        return extraMaxCpRate;
+    }
+
+    public void setExtraMaxCpRate(float rate) {
+        float v = Math.max(0.0f, rate);
+        if (v == extraMaxCpRate) {
+            return;
+        }
+        extraMaxCpRate = v;
+        markDirty();
+    }
+
+    public float getMaxCpMultiplier() {
+        return maxCpMultiplier;
+    }
+
+    public void setMaxCpMultiplier(float value) {
+        float v = Math.max(1.0f, value);
+        if (v == maxCpMultiplier) {
+            return;
+        }
+        maxCpMultiplier = v;
+        markDirty();
     }
 
     public float getAddMaxCP() {
@@ -262,19 +357,10 @@ public class CPData extends DataPart<EntityPlayer> {
         return addMaxOverload;
     }
 
-    /**
-     * Performs a generic ability action.
-     * Will fail when either can't overload anymore or can't consume cp.
-     * @param overloadToAdd Amount of overload
-     * @param cpToAdd Amount of CP
-     */
     public boolean perform(float overloadToAdd, float cpToAdd) {
         return performInternal(overloadToAdd, cpToAdd, false);
     }
 
-    /**
-     * Consume the CP and does the overload without any validation. This should be used WITH CAUTION.
-     */
     public void performWithForce(float overload, float cp) {
         performInternal(overload, cp, true);
     }
@@ -286,9 +372,13 @@ public class CPData extends DataPart<EntityPlayer> {
 
         boolean result;
 
-        // consume CP/Overload
-        if (!getEntity().capabilities.isCreativeMode) {
-            result = consumeCP(cp, force);
+        if (!getEntity().getAbilities().instabuild) {
+
+            // A normal skill use must also start the configured recovery cooldown.
+            // The 1.12.2 implementation always did this; without it CP starts
+            // regenerating on the very next tick and high-level players appear
+            // to spend no CP at all.
+            result = consumeCP(cp, force, true);
             if (result) {
                 addOverload(overload);
             }
@@ -296,7 +386,6 @@ public class CPData extends DataPart<EntityPlayer> {
             result = true;
         }
 
-        // Add maxcp/maxoverload
         if (result) {
             addMaxCP(cp);
             addMaxOverload(overload);
@@ -312,13 +401,8 @@ public class CPData extends DataPart<EntityPlayer> {
         return Pair.of(evt.overload, evt.cp);
     }
 
-    /***
-     * A pre test to judge whether the skill can be performed.
-     * @return Whether the player can perform the ability with the given consumption currently,
-     *     takes account of creative mode.
-     */
     public boolean canPerform(float cp) {
-        return getEntity().capabilities.isCreativeMode || this.getCP() >= cp;
+        return getEntity().getAbilities().instabuild || this.getCP() >= cp;
     }
 
     public boolean isOverloadRecovering() {
@@ -326,68 +410,73 @@ public class CPData extends DataPart<EntityPlayer> {
     }
 
     private void addMaxCP(float consumedCP) {
-        setAddMaxCP(addMaxCP + consumedCP * getFloat("maxcp_incr_rate"));
+        setAddMaxCP(addMaxCP + consumedCP * AbilityConfig.maxCpIncrRate());
     }
 
     private void addMaxOverload(float overload) {
         AbilityData aData = AbilityData.get(getEntity());
         float max = getMaxAddOverload(aData.getLevel());
-        float add = MathUtils.clampf(0, 10, overload * getFloat("maxo_incr_rate"));
+        float add = MathUtils.clampf(0, 10, overload * AbilityConfig.maxOverloadIncrRate());
         addMaxOverload += add;
-        if(addMaxOverload > max)
+        if (addMaxOverload > max)
             addMaxOverload = max;
     }
 
     private float getCPRecoverSpeed() {
-        float raw = getFloat("cp_recover_speed") *
-                0.0003f * maxCP *
-                MathUtils.lerpf(1, 2, curCP / maxCP);
+        float cap = getMaxCP();
+        float ratio = cap > 0.0f ? curCP / cap : 0.0f;
+        float raw = AbilityConfig.cpRecoverSpeed() *
+                0.0003f * cap *
+                MathUtils.lerpf(1, 2, ratio);
 
         return CalcEvent.calc(new CPRecoverSpeed(getEntity(), 1)) * raw;
     }
 
     private float getOverloadRecoverSpeed() {
-        float raw = getFloat("overload_recover_speed") *
+        float raw = AbilityConfig.overloadRecoverSpeed() *
                 Math.max(0.002f * maxOverload,
                         0.007f * maxOverload * MathUtils.lerpf(1, 0.5f, curOverload / maxOverload / 2));
 
         return CalcEvent.calc(new OverloadRecoverSpeed(getEntity(), 1)) * raw;
     }
 
-    /**
-     * Can be called in both sides. Consumes the CP and return whether the action is successful.
-     * Will just make a simulation in client side.
-     */
-    private boolean consumeCP(float amt, boolean force) {
-        if(!force && curCP < amt)
+    private boolean consumeCP(float amt, boolean force, boolean holdRecover) {
+        if (!force && curCP < amt)
             return false;
 
         curCP = Math.max(0, curCP - amt);
-        untilRecover = getInt("cp_recover_cooldown");
 
-        if(!isClient())
+        if (amt > 0.0f) {
+            consumeSeq++;
+        }
+        if (holdRecover) {
+            untilRecover = AbilityConfig.cpRecoverCooldown();
+        }
+
+        if (!isClient())
             dataDirty = true;
 
         return true;
     }
 
-    /**
-     * Add a specific amount of overload.
-     */
+    public void drainCP(float amt) {
+        consumeCP(amt, true, true);
+    }
+
     private void addOverload(float amt) {
-        if(getEntity().capabilities.isCreativeMode)
+        if (getEntity().getAbilities().instabuild)
             return;
 
         curOverload = Math.min(getMaxOverload(), curOverload + amt);
 
-        untilOverloadRecover = getInt("overload_recover_cooldown");
+        untilOverloadRecover = AbilityConfig.overloadRecoverCooldown();
 
-        if(curOverload == getMaxOverload()) {
+        if (curOverload == getMaxOverload()) {
             MinecraftForge.EVENT_BUS.post(new OverloadEvent(getEntity()));
             overloadFine = false;
         }
 
-        if(!isClient())
+        if (!isClient())
             dataDirty = true;
     }
 
@@ -395,12 +484,6 @@ public class CPData extends DataPart<EntityPlayer> {
         return !overloadFine && untilOverloadRecover > 0;
     }
 
-    /**
-     * SERVER ONLY. <br/>
-     * Should be called when player upgrades level.
-     * Recalc the max overload and max cp based on
-     * currently learned buff skills and level.
-     */
     public void recalcMaxValue() {
         AbilityData data = AbilityData.get(getEntity());
 
@@ -410,95 +493,72 @@ public class CPData extends DataPart<EntityPlayer> {
         curCP = getMaxCP();
         curOverload = 0;
 
-        if(!isClient())
+        if (!isClient())
             sync();
     }
 
-    // Inteference API
+    public void refreshMaxFromConfig() {
+        if (isClient()) {
+            return;
+        }
+        AbilityData data = AbilityData.get(getEntity());
+        float newMaxCP = getInitCP(data.getLevel());
+        float newMaxOverload = getInitOverload(data.getLevel());
+        if (newMaxCP == maxCP && newMaxOverload == maxOverload) {
+            return;
+        }
+        maxCP = newMaxCP;
+        maxOverload = newMaxOverload;
 
-    // Observers
+        curCP = MathUtils.clampf(0, getMaxCP(), curCP);
+        curOverload = MathUtils.clampf(0, getMaxOverload(), curOverload);
+        sync();
+    }
 
-    /**
-     * @return If the ability is being intefered.
-     */
     public boolean isInterfering() {
         return interfering;
     }
 
-    /**
-     * @return Whether the interference source with given name is present.
-     */
     public boolean hasInterfSource(String name) {
         return interfSources.containsKey(name);
     }
 
-    // Modifiers
-
-    /**
-     * Adds a interference source. SERVER only.
-     * @param id The unique id of the source. If the source with same id previously exists, it will be discarded.
-     * @param interferer The source
-     */
     public void addInterf(String id, IInterfSource interferer) {
-        checkSide(Side.SERVER);
+        checkSide(LogicalSide.SERVER);
 
         interfSources.put(id, interferer);
     }
 
-    /**
-     * Removes all inteference source. SERVER only.
-     */
     public void removeInterf() {
-        checkSide(Side.SERVER);
+        checkSide(LogicalSide.SERVER);
 
         interfSources.clear();
     }
 
-    /**
-     * Removes the given interference source, if any. SERVER only.
-     * @param name The name of given interference
-     */
     public void removeInterf(String name) {
-        checkSide(Side.SERVER);
+        checkSide(LogicalSide.SERVER);
 
         interfSources.remove(name);
     }
 
-    // Inteference API end
-
-    private int getInt(String name) {
-        return config.getInt(name);
-    }
-
-    private float getFloat(String name) {
-        return (float) config.getDouble(name);
-    }
-
     public float getInitCP(int level) {
-        float rawValue = config.getDoubleList("init_cp").get(level).floatValue();
-
-        return CalcEvent.calc(new CalcEvent.MaxCP(getEntity(), rawValue));
+        return CalcEvent.calc(new CalcEvent.MaxCP(getEntity(), AbilityConfig.initCp(level)));
     }
 
     public float getInitOverload(int level) {
-        float rawValue = config.getDoubleList("init_overload").get(level).floatValue();
-
-        return CalcEvent.calc(new CalcEvent.MaxOverload(getEntity(), rawValue));
+        return CalcEvent.calc(new CalcEvent.MaxOverload(getEntity(), AbilityConfig.initOverload(level)));
     }
 
     public float getMaxAddCP(int level) {
-        return config.getDoubleList("add_cp").get(level).floatValue();
+        return AbilityConfig.addCp(level);
     }
 
     public float getMaxAddOverload(int level) {
-        return config.getDoubleList("add_overload").get(level).floatValue();
+        return AbilityConfig.addOverload(level);
     }
 
-    /**
-     * Effective in SERVER. Recover all the cp and overload.
-     */
     public void recoverAll() {
-        if(!isClient()) {
+        if (!isClient()) {
             curCP = getMaxCP();
             curOverload = 0;
             overloadFine = false;
@@ -507,37 +567,105 @@ public class CPData extends DataPart<EntityPlayer> {
     }
 
     @Override
-    public void toNBT(NBTTagCompound tag) {
-        NBTS11n.write(tag, this);
+    public void toNBT(CompoundTag tag) {
+        tag.putBoolean("activated", activated);
+        tag.putFloat("curCP", curCP);
+        tag.putFloat("maxCP", maxCP);
+        tag.putFloat("addMaxCP", addMaxCP);
+
+        tag.putFloat("maxCpMultiplier", maxCpMultiplier);
+        tag.putFloat("curOverload", curOverload);
+        tag.putFloat("maxOverload", maxOverload);
+        tag.putFloat("addMaxOverload", addMaxOverload);
+        tag.putBoolean("overloadFine", overloadFine);
+        tag.putBoolean("interfering", interfering);
+        tag.putInt("untilRecover", untilRecover);
+        tag.putInt("untilOverloadRecover", untilOverloadRecover);
     }
 
     @Override
-    public void fromNBT(NBTTagCompound tag) {
-        NBTS11n.read(tag, this);
+    public void fromNBT(CompoundTag tag) {
+        activated = tag.getBoolean("activated");
+        curCP = tag.getFloat("curCP");
+        maxCP = tag.getFloat("maxCP");
+        addMaxCP = tag.getFloat("addMaxCP");
+
+        maxCpMultiplier = tag.contains("maxCpMultiplier")
+                ? Math.max(1.0f, tag.getFloat("maxCpMultiplier"))
+                : 1.0f;
+        curOverload = tag.getFloat("curOverload");
+        maxOverload = tag.getFloat("maxOverload");
+        addMaxOverload = tag.getFloat("addMaxOverload");
+        overloadFine = tag.getBoolean("overloadFine");
+        interfering = tag.getBoolean("interfering");
+        untilRecover = tag.getInt("untilRecover");
+        untilOverloadRecover = tag.getInt("untilOverloadRecover");
     }
 
-    @Listener(channel=MSG_ACTIVATE_SVR, side=Side.SERVER)
-    private void activateAtServer(boolean state) {
-        setActivateState(state);
+    @Override
+    protected void writeSyncData(FriendlyByteBuf buf) {
+        buf.writeBoolean(activated);
+        buf.writeFloat(curCP);
+        buf.writeFloat(maxCP);
+        buf.writeFloat(addMaxCP);
+        buf.writeFloat(curOverload);
+        buf.writeFloat(maxOverload);
+        buf.writeFloat(addMaxOverload);
+        buf.writeBoolean(overloadFine);
+        buf.writeBoolean(interfering);
+        buf.writeVarInt(untilRecover);
+        buf.writeVarInt(untilOverloadRecover);
+
+        buf.writeFloat(extraMaxCpRate);
+        buf.writeBoolean(lifeGuarded);
+        buf.writeBoolean(lifeTakenOver);
+        buf.writeFloat(maxCpMultiplier);
+        buf.writeVarInt(consumeSeq);
     }
 
-    @Listener(channel=MSG_POST_EVENT, side={Side.CLIENT,Side.SERVER})
+    @Override
+    protected void readSyncData(FriendlyByteBuf buf) {
+        activated = buf.readBoolean();
+        curCP = buf.readFloat();
+        maxCP = buf.readFloat();
+        addMaxCP = buf.readFloat();
+        curOverload = buf.readFloat();
+        maxOverload = buf.readFloat();
+        addMaxOverload = buf.readFloat();
+        overloadFine = buf.readBoolean();
+        interfering = buf.readBoolean();
+        untilRecover = buf.readVarInt();
+        untilOverloadRecover = buf.readVarInt();
+        extraMaxCpRate = buf.readFloat();
+        lifeGuarded = buf.readBoolean();
+        lifeTakenOver = buf.readBoolean();
+        maxCpMultiplier = buf.readFloat();
+        consumeSeq = buf.readVarInt();
+    }
+
+    @Listener(channel = MSG_ACTIVATE_SVR, side = LogicalSide.SERVER)
+    private void activateAtServer(boolean state, Integer sourceOrdinal) {
+        setActivateState(state, sourceOrdinal == null
+                ? AbilityToggleSource.UNKNOWN
+                : AbilityToggleSource.fromOrdinal(sourceOrdinal));
+    }
+
+    @Listener(channel = MSG_POST_EVENT, side = {LogicalSide.CLIENT, LogicalSide.SERVER})
     private void postEvent(boolean state) {
         MinecraftForge.EVENT_BUS.post(state ?
                 new AbilityActivateEvent(getEntity()) :
                 new AbilityDeactivateEvent(getEntity()));
     }
 
-    public enum Events {
-        @RegEventHandler()
-        instance;
+    public static class Events {
 
         @SubscribeEvent
         public void changedCategory(CategoryChangeEvent event) {
             CPData cpData = CPData.get(event.player);
 
-            if(!AbilityData.get(event.player).hasCategory()) {
-                cpData.setActivateState(false);
+            if (!AbilityData.get(event.player).hasCategory()) {
+
+                cpData.setActivateState(false, AbilityToggleSource.SYSTEM);
             }
             cpData.recalcMaxValue();
         }
@@ -556,21 +684,21 @@ public class CPData extends DataPart<EntityPlayer> {
 
         @SubscribeEvent
         public void playerWakeup(PlayerWakeUpEvent event) {
-            if(!event.wakeImmediately() && !event.updateWorld() && event.shouldSetSpawn())
-                CPData.get(event.getEntityPlayer()).recoverAll();
+
+            if (!event.wakeImmediately()) {
+                CPData.get(event.getEntity()).recoverAll();
+            }
         }
 
         @SubscribeEvent(priority = EventPriority.LOWEST)
         public void playerDeath(LivingDeathEvent event) {
-            if(event.getEntityLiving() instanceof EntityPlayer) {
-                EntityPlayer player = (EntityPlayer) event.getEntityLiving();
+            if (event.getEntity() instanceof Player player) {
                 CPData cpData = CPData.get(player);
 
                 cpData.recoverAll();
-                cpData.setActivateState(false);
+
+                cpData.setActivateState(false, AbilityToggleSource.SYSTEM);
             }
         }
-
     }
-
 }

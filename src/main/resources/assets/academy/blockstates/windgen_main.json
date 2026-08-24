@@ -1,1 +1,19 @@
-{"variants":{"normal":{"model":"academy:windgen_main"}},"__xconfgen":true}
+{
+  "variants": {
+    "facing=north,sub=0": { "model": "academy:block/windgen_main", "y": 180 },
+    "facing=north,sub=1": { "model": "academy:block/windgen_main_ghost1", "y": 180 },
+    "facing=north,sub=2": { "model": "academy:block/windgen_main_ghost2", "y": 180 },
+
+    "facing=south,sub=0": { "model": "academy:block/windgen_main" },
+    "facing=south,sub=1": { "model": "academy:block/windgen_main_ghost1" },
+    "facing=south,sub=2": { "model": "academy:block/windgen_main_ghost2" },
+
+    "facing=west,sub=0": { "model": "academy:block/windgen_main", "y": 90 },
+    "facing=west,sub=1": { "model": "academy:block/windgen_main_ghost1", "y": 90 },
+    "facing=west,sub=2": { "model": "academy:block/windgen_main_ghost2", "y": 90 },
+
+    "facing=east,sub=0": { "model": "academy:block/windgen_main", "y": 270 },
+    "facing=east,sub=1": { "model": "academy:block/windgen_main_ghost1", "y": 270 },
+    "facing=east,sub=2": { "model": "academy:block/windgen_main_ghost2", "y": 270 }
+  }
+}

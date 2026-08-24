@@ -2,70 +2,82 @@ package cn.academy.ability.develop.action;
 
 import cn.academy.ACItems;
 import cn.academy.ability.Category;
-import cn.academy.datapart.AbilityData;
 import cn.academy.ability.develop.DeveloperType;
 import cn.academy.ability.develop.IDeveloper;
+import cn.academy.datapart.AbilityData;
 import cn.academy.event.ability.TransformCategoryEvent;
-import cn.academy.item.ItemInductionFactor;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumHand;
+import cn.academy.item.InductionFactorItem;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;
 
 import java.util.Optional;
 
 public class DevelopActionReset implements IDevelopAction {
 
-    public static boolean canReset(EntityPlayer player, IDeveloper developer) {
+    public static boolean canReset(Player player, IDeveloper developer) {
         AbilityData data = AbilityData.get(player);
-        ItemStack equip = player.getHeldItemMainhand();
+        ItemStack equip = player.getMainHandItem();
         Optional<ItemStack> factor = getFactor(player);
 
-        int level = data.getLevel();
-
-        return level >= 3 &&
-                developer.getType() == DeveloperType.ADVANCED &&
-                !equip.isEmpty() && equip.getItem() == ACItems.magnetic_coil &&
-                factor.isPresent() && ItemInductionFactor.getCategory(factor.get()) != data.getCategory();
+        return data.getLevel() >= 3
+                && developer.getDeveloperType() == DeveloperType.ADVANCED
+                && !equip.isEmpty() && equip.getItem() == ACItems.MAGNETIC_COIL.get()
+                && factor.isPresent()
+                && InductionFactorItem.getCategory(factor.get()) != data.getCategory();
     }
 
-    static Optional<ItemStack> getFactor(EntityPlayer player) {
+    static Optional<ItemStack> getFactor(Player player) {
         Category playerCategory = AbilityData.get(player).getCategoryNullable();
-        return player.inventory.mainInventory.parallelStream()
-                .filter(stack -> (!stack.isEmpty()) && stack.getItem() instanceof ItemInductionFactor)
-                .filter(stack -> ItemInductionFactor.getCategory(stack) != playerCategory)
-                .findAny();
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.isEmpty() || !(stack.getItem() instanceof InductionFactorItem)) continue;
+            Category c = InductionFactorItem.getCategory(stack);
+            if (c != null && c != playerCategory) {
+                return Optional.of(stack);
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
-    public int getStimulations(EntityPlayer player) {
-        AbilityData data = AbilityData.get(player);
-        return data.getLevel() * 10;
+    public int getStimulations(Player player) {
+        return AbilityData.get(player).getLevel() * 10;
     }
 
     @Override
-    public boolean validate(EntityPlayer player, IDeveloper developer) {
+    public boolean validate(Player player, IDeveloper developer) {
         return canReset(player, developer);
     }
 
     @Override
-    public void onLearned(EntityPlayer player) {
+    public void onLearned(Player player) {
         AbilityData data = AbilityData.get(player);
+        ItemStack factor = getFactor(player).orElse(ItemStack.EMPTY);
+        if (factor.isEmpty()) return;
 
-        ItemStack factor = getFactor(player).get();
-
-        Category newCat = ItemInductionFactor.getCategory(factor);
+        Category newCat = InductionFactorItem.getCategory(factor);
+        if (newCat == null) return;
 
         int prevLevel = data.getLevel() - 1;
-        if(!MinecraftForge.EVENT_BUS.post(new TransformCategoryEvent(player, newCat, prevLevel)))
-        {
+
+        if (!MinecraftForge.EVENT_BUS.post(new TransformCategoryEvent(player, newCat, prevLevel))) {
             data.setCategory(newCat);
             data.setLevel(prevLevel);
 
-            player.setHeldItem(EnumHand.MAIN_HAND, ItemStack.EMPTY);
+            ItemStack coil = player.getMainHandItem();
+            coil.shrink(1);
+            if (coil.isEmpty()) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            }
 
-            int factorIdx = player.inventory.mainInventory.indexOf(factor);
-            player.inventory.mainInventory.set(factorIdx, ItemStack.EMPTY);
+            int idx = player.getInventory().items.indexOf(factor);
+            if (idx >= 0) {
+                factor.shrink(1);
+                if (factor.isEmpty()) {
+                    player.getInventory().items.set(idx, ItemStack.EMPTY);
+                }
+            }
         }
     }
 }

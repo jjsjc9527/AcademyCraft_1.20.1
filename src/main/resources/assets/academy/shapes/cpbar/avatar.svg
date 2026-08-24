@@ -1,0 +1,13 @@
+<svg id="图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960.51 133.79">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #90d5e6;
+      }
+    </style>
+  </defs>
+  <g id="能力icon">
+    <polygon class="cls-1" points="779.73 108.28 779.73 26.86 913.05 26.86 913.05 108.61 779.73 108.28"/>
+    <path d="M912.05,27.86v79.75l-131.32-.33V27.86H912.05m2-2H778.73v83.41l135.32.34V25.86Z"/>
+  </g>
+</svg>

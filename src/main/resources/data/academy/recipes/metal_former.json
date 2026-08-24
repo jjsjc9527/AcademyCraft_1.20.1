@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ " S ", "AMA", "PUP" ], "key": { "S": { "item": "minecraft:shears" }, "A": { "item": "academy:calc_chip" }, "M": { "item": "academy:machine_frame" }, "P": { "item": "academy:constraint_plate" }, "U": { "item": "academy:matter_unit" } }, "result": { "item": "academy:metal_former" } }

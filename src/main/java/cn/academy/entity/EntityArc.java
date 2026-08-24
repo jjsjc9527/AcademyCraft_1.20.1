@@ -1,167 +1,222 @@
 package cn.academy.entity;
 
+import cn.academy.ACEntities;
 import cn.academy.client.render.util.ArcFactory;
 import cn.academy.client.render.util.ArcFactory.Arc;
-import cn.lambdalib2.registry.mc.RegEntity;
-/*
-import cn.lambdalib2.util.deprecated.ViewOptimize;
-import cn.lambdalib2.util.deprecated.ViewOptimize.IAssociatePlayer;
-import cn.lambdalib2.util.Motion3D;
-import cn.lambdalib2.util.entityx.EntityAdvanced;*/
-import cn.lambdalib2.registry.mc.RegEntityRender;
-import cn.lambdalib2.util.EntityLook;
 import cn.lambdalib2.util.MathUtils;
 import cn.lambdalib2.util.ViewOptimize;
-import cn.lambdalib2.util.entityx.EntityAdvanced;
-import net.minecraft.client.renderer.entity.Render;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- *
- */
-@SideOnly(Side.CLIENT)
-public class EntityArc extends EntityAdvanced implements ViewOptimize.IAssociatePlayer
-{
-    
+@OnlyIn(Dist.CLIENT)
+public class EntityArc extends net.minecraft.world.entity.Entity
+        implements ViewOptimize.IAssociatePlayer, cn.academy.client.render.ACEffect {
+
     static final int GEN = 20;
-    
-    // Default patterns
+
     static Arc[] defaultPatterns = new Arc[GEN];
+
     static {
         ArcFactory fac = new ArcFactory();
-        for(int i = 0; i < GEN; ++i) {
+        for (int i = 0; i < GEN; ++i) {
             defaultPatterns[i] = fac.generate(20);
         }
     }
 
-    final Arc[] patterns;
-    
-    int [] iid;
-    int n = 1;//RandUtils.rangei(1, 2);
+    public final Arc[] patterns;
+
+    int[] iid;
+    int n = 1;
     boolean show = true;
-    
-    /**
-     * Render properties
-     */
-    public double 
-        showWiggle = .2,
-        hideWiggle = .2,
-        texWiggle = .5;
-    
+
+    public double
+            showWiggle = .2,
+            hideWiggle = .2,
+            texWiggle = .5;
+
     public double length = 20.0;
     public boolean lengthFixed = true;
-    
-    public boolean viewOptimize = true;
-    
-    final EntityPlayer player;
 
-    public EntityArc(EntityPlayer _player, Arc[]_patterns) {
-        super(_player.getEntityWorld());
-        this.player = _player;
-        this.setPosition(player.posX, player.posY + _player.eyeHeight, player.posZ);
-        new EntityLook(_player).applyToEntity(this);
-        ignoreFrustumCheck = true;
-        iid = new int[n];
-        
-        this.patterns = _patterns;
-    }
-    
-    public EntityArc(EntityPlayer _player) {
-        this(_player, defaultPatterns);
-    }
-    
+    public boolean viewOptimize = true;
+
+    public int life = -1;
+
+    public final double spawnTime = cn.lambdalib2.util.GameTimer.getPausableTime();
+
     @Override
-    public void onUpdate() {
-        super.onUpdate();
-        for(int i = 0; i < iid.length; ++i) {
-            if(rand.nextDouble() < texWiggle)
-                iid[i] = rand.nextInt(patterns.length);
+    public boolean effectExpired(double now) {
+        return life >= 0 && (now - spawnTime) * 20.0 > life + 5;
+    }
+
+    public boolean fade = false;
+    public int fadeIn = 2;
+    public int fadeOut = 4;
+
+    public float alphaAt(float partialTick) {
+        if (!fade || life < 0) return 1f;
+        float age = tickCount + partialTick;
+        float a = 1f;
+        if (fadeIn > 0 && age < fadeIn) a = age / fadeIn;
+        float remain = life - age;
+        if (fadeOut > 0 && remain < fadeOut) a = Math.min(a, remain / fadeOut);
+        return a < 0f ? 0f : (a > 1f ? 1f : a);
+    }
+
+    public int boneIndex = -1;
+
+    public double endX, endY, endZ;
+
+    public float colorR = 1f, colorG = 1f, colorB = 1f;
+
+    public EntityArc setColor(float r, float g, float b) {
+        colorR = r;
+        colorG = g;
+        colorB = b;
+        return this;
+    }
+
+    private final Player player;
+
+    public EntityArc(Player player, Arc[] patterns) {
+        super(ACEntities.ARC.get(), player.level());
+        this.player = player;
+
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0f);
+        setPos(eye.x, eye.y, eye.z);
+        double dxz = Math.sqrt(look.x * look.x + look.z * look.z);
+        setYRot((float) (-Math.atan2(look.x, look.z) * 180 / Math.PI));
+        setXRot((float) (-Math.atan2(look.y, dxz) * 180 / Math.PI));
+        noCulling = true;
+        iid = new int[n];
+
+        this.patterns = patterns;
+    }
+
+    public EntityArc(Player player) {
+        this(player, defaultPatterns);
+    }
+
+    public EntityArc setLife(int ticks) {
+        this.life = ticks;
+        return this;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        for (int i = 0; i < iid.length; ++i) {
+            if (random.nextDouble() < texWiggle) {
+                iid[i] = random.nextInt(patterns.length);
+            }
         }
-        if(show && rand.nextDouble() < showWiggle) {
+
+        if (show && random.nextDouble() < showWiggle) {
+            show = !show;
+        } else if (!show && random.nextDouble() < hideWiggle) {
             show = !show;
         }
-        else if(!show && rand.nextDouble() < hideWiggle) {
-            show = !show;
+
+        if (life >= 0 && tickCount >= life) {
+            discard();
         }
     }
-    
+
+    private Vec3[] path;
+
+    private double[] pathCum;
+
+    public Vec3[] getPath() {
+        return path;
+    }
+
+    public double[] getPathCum() {
+        return pathCum;
+    }
+
+    public void setPath(java.util.List<Vec3> worldPoints) {
+        if (worldPoints == null || worldPoints.size() < 2) {
+            return;
+        }
+        java.util.List<Vec3> pts = new java.util.ArrayList<>();
+        for (Vec3 p : worldPoints) {
+            if (pts.isEmpty() || p.distanceToSqr(pts.get(pts.size() - 1)) > 1.0e-8) {
+                pts.add(p);
+            }
+        }
+        if (pts.size() < 2) {
+            return;
+        }
+
+        Vec3 origin = pts.get(0);
+        path = new Vec3[pts.size()];
+        pathCum = new double[pts.size()];
+        path[0] = Vec3.ZERO;
+        for (int i = 1; i < pts.size(); i++) {
+            path[i] = pts.get(i).subtract(origin);
+            pathCum[i] = pathCum[i - 1] + pts.get(i).distanceTo(pts.get(i - 1));
+        }
+
+        setPos(origin.x, origin.y, origin.z);
+        Vec3 last = pts.get(pts.size() - 1);
+        endX = last.x;
+        endY = last.y;
+        endZ = last.z;
+
+        Vec3 d = pts.get(1).subtract(origin);
+        setYRot((float) (-Math.atan2(d.x, d.z) * 180 / Math.PI));
+        setXRot((float) (-Math.atan2(d.y, d.horizontalDistance()) * 180 / Math.PI));
+
+        length = pathCum[pathCum.length - 1];
+        lengthFixed = false;
+    }
+
     public void setFromTo(double x0, double y0, double z0, double x1, double y1, double z1) {
-        setPosition(x0, y0, z0);
-        
+        setPos(x0, y0, z0);
+        endX = x1; endY = y1; endZ = z1;
+
         double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
         double dxzsq = dx * dx + dz * dz;
-        rotationYaw = (float) (-Math.atan2(dx, dz) * 180 / Math.PI);
-        rotationPitch = (float) (-Math.atan2(dy, Math.sqrt(dxzsq)) * 180 / Math.PI);
-        
+        setYRot((float) (-Math.atan2(dx, dz) * 180 / Math.PI));
+        setXRot((float) (-Math.atan2(dy, Math.sqrt(dxzsq)) * 180 / Math.PI));
+
         length = MathUtils.distance(x0, y0, z0, x1, y1, z1);
     }
 
-    @Override
-    protected void readEntityFromNBT(NBTTagCompound nbt) {
+    public void aimFrom(double x0, double y0, double z0) {
+        double dx = endX - x0, dy = endY - y0, dz = endZ - z0;
+        double dxzsq = dx * dx + dz * dz;
+        setYRot((float) (-Math.atan2(dx, dz) * 180 / Math.PI));
+        setXRot((float) (-Math.atan2(dy, Math.sqrt(dxzsq)) * 180 / Math.PI));
+        length = MathUtils.distance(x0, y0, z0, endX, endY, endZ);
+    }
+
+    public boolean isShown() {
+        return show;
+    }
+
+    public int[] patternIds() {
+        return iid;
+    }
+
+    public int subArcCount() {
+        return n;
     }
 
     @Override
-    protected void writeEntityToNBT(NBTTagCompound p_70014_1_) {
-    }
-    
-    @Override
-    public boolean shouldRenderInPass(int pass) {
-        return pass == 1;
-    }
-
-    @SideOnly(Side.CLIENT)
-    @RegEntityRender(EntityArc.class)
-    public static class Renderer extends Render<EntityArc> {
-
-        public Renderer(RenderManager renderManager) {
-            super(renderManager);
-        }
-
-        @Override
-        public void doRender(EntityArc arc, double x, double y, double z, float f, float g) {
-            if(!arc.show)
-                return;
-            
-            GL11.glPushMatrix();
-            
-            GL11.glTranslated(x, y, z);
-            GL11.glRotatef(arc.rotationYaw + 90, 0, -1, 0);
-            GL11.glRotatef(arc.rotationPitch, 0, 0, -1);
-
-            if(arc.viewOptimize) {
-                ViewOptimize.fix(arc);
-            }
-            
-            if(arc.lengthFixed) {
-                for(int i = 0; i < arc.n; ++i)
-                    arc.patterns[arc.iid[i]].draw();
-            } else {
-                for(int i = 0; i < arc.n; ++i) {
-                    arc.patterns[arc.iid[i]].draw(arc.length);
-                }
-            }
-            
-            GL11.glPopMatrix();
-        }
-
-        @Override
-        protected ResourceLocation getEntityTexture(EntityArc entity) {
-            return null;
-        }
-        
-    }
-
-    @Override
-    public EntityPlayer getPlayer() {
+    public Player getPlayer() {
         return player;
     }
 
+    @Override
+    protected void defineSynchedData() {}
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag) {}
 }

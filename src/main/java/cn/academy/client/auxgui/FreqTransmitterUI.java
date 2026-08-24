@@ -1,144 +1,243 @@
 package cn.academy.client.auxgui;
 
-import cn.academy.AcademyCraft;
-import cn.academy.client.render.util.ACRenderingHelper;
 import cn.academy.Resources;
-import cn.academy.energy.api.WirelessHelper;
+import cn.academy.block.block.ACMultiBlock;
+import cn.academy.client.render.util.ACRenderingHelper;
 import cn.academy.energy.api.block.IWirelessMatrix;
 import cn.academy.energy.api.block.IWirelessNode;
 import cn.academy.energy.api.block.IWirelessUser;
-import cn.academy.event.energy.LinkUserEvent;
-import cn.academy.event.energy.LinkNodeEvent;
-import cn.academy.energy.impl.WirelessNet;
+import cn.academy.network.FreqTransmitterActionMessage;
+import cn.academy.network.FreqTransmitterResultMessage;
 import cn.academy.terminal.app.AppFreqTransmitter;
-import cn.lambdalib2.multiblock.BlockMulti;
-import cn.lambdalib2.s11n.network.Future;
-import cn.lambdalib2.s11n.network.NetworkMessage;
-import cn.lambdalib2.s11n.network.NetworkS11nType;
-import cn.lambdalib2.util.*;
 import cn.lambdalib2.auxgui.AuxGui;
+import cn.lambdalib2.input.KeyManager;
 import cn.lambdalib2.render.font.IFont;
 import cn.lambdalib2.render.font.IFont.Extent;
 import cn.lambdalib2.render.font.IFont.FontOption;
-import cn.lambdalib2.input.KeyManager;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.math.RayTraceResult;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.InputEvent;
-import net.minecraftforge.fml.common.gameevent.InputEvent.MouseInputEvent;
-import net.minecraft.block.Block;
+import cn.lambdalib2.util.Color;
+import cn.lambdalib2.util.Colors;
+import cn.lambdalib2.util.ControlOverrider;
+import cn.lambdalib2.util.GameTimer;
+import cn.lambdalib2.util.HudUtils;
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.ScaledResolution;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.ChatAllowedCharacters;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.Color;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import org.lwjgl.glfw.GLFW;
 
-/**
- * @author WeAthFolD
- */
+@OnlyIn(Dist.CLIENT)
 public class FreqTransmitterUI extends AuxGui {
-    /**
-     * @author WeAthFolD
-     */
-    @NetworkS11nType
-    static class Syncs {
-
-        public static final String
-            MSG_QUERY_SSID = "query_ssid",
-            MSG_AUTH_MATRIX = "auth_matrix",
-            MSG_AUTH_NODE   = "auth_node",
-            MSG_LINK_NODE = "link_node",
-            MSG_LINK_USER = "link_user";
-
-        private static Object delegate = NetworkMessage.staticCaller(Syncs.class);
-
-        public static void querySSID(IWirelessMatrix matrix, Future<String> future) {
-            send(MSG_QUERY_SSID, matrix, future);
-        }
-
-        public static void authorizeMatrix(IWirelessMatrix matrix, String password, Future<Boolean> future) {
-            send(MSG_AUTH_MATRIX, matrix, password, future);
-        }
-
-        public static void authorizeNode(IWirelessNode node, String password, Future<Boolean> future) {
-            send(MSG_AUTH_NODE, node, password, future);
-        }
-
-        public static void linkNodeToMatrix(IWirelessNode node, IWirelessMatrix matrix, String password, Future<Boolean> future) {
-            send(MSG_LINK_NODE, node, matrix, password, future);
-        }
-
-        public static void linkUserToNode(IWirelessUser user, IWirelessNode node, Future<Boolean> future) {
-            send(MSG_LINK_USER, user, node, future);
-        }
-
-        @NetworkMessage.Listener(channel=MSG_QUERY_SSID, side=Side.SERVER)
-        private static void hQuerySSID(IWirelessMatrix matrix, Future<String> future) {
-            WirelessNet net = WirelessHelper.getWirelessNet(matrix);
-            future.sendResult(net != null ? net.getSSID() : null);
-        }
-
-        @NetworkMessage.Listener(channel=MSG_AUTH_MATRIX, side=Side.SERVER)
-        private static void hAuthorizeMatrix(IWirelessMatrix matrix, String password, Future<Boolean> future) {
-            WirelessNet net = WirelessHelper.getWirelessNet(matrix);
-            future.sendResult(net != null && net.getPassword().equals(password));
-        }
-
-        @NetworkMessage.Listener(channel=MSG_LINK_NODE, side=Side.SERVER)
-        private static void hLinkNodeToMatrix(IWirelessNode node, IWirelessMatrix matrix, String password, Future<Boolean> future) {
-            WirelessNet net = WirelessHelper.getWirelessNet(matrix);
-            future.sendResult(net != null &&
-                !MinecraftForge.EVENT_BUS.post(new LinkNodeEvent(node, net.getMatrix(), password)));
-        }
-
-        @NetworkMessage.Listener(channel=MSG_LINK_USER, side=Side.SERVER)
-        private static void hLinkUserToNode(IWirelessUser user, IWirelessNode node, Future<Boolean> future) {
-            future.sendResult(!MinecraftForge.EVENT_BUS.post(new LinkUserEvent(user, node)));
-        }
-
-        @NetworkMessage.Listener(channel=MSG_AUTH_NODE, side=Side.SERVER)
-        private static void hAuthNode(IWirelessNode node, String pass, Future<Boolean> future) {
-            future.sendResult(node.getPassword().equals(pass));
-        }
-
-        private static void send(String channel, Object... args) {
-            NetworkMessage.sendToServer(delegate, channel, args);
-        }
-
-    }
 
     private static final String OVERRIDE_GROUP = "AC_FreqTransmitter";
 
-    @SideOnly(Side.CLIENT)
+    private static final Color
+            BG_COLOR = Colors.fromHexColor(0x77272727),
+            GLOW_COLOR = Colors.fromHexColor(0xaaffffff);
+
+    private static final double GLOW_SIZE = 1;
+
+    private static final double REACH = 4.0;
+
+    final IFont font = Resources.font();
+
+    final Player player;
+    final Level level;
+
+    State current;
+
+    private boolean completeOverriding;
+
+    public FreqTransmitterUI() {
+        player = Minecraft.getInstance().player;
+        level = player.level();
+        consistent = false;
+
+        MinecraftForge.EVENT_BUS.register(this);
+
+        setState(new StateStart());
+
+        ControlOverrider.override(OVERRIDE_GROUP, KeyManager.MOUSE_LEFT, KeyManager.MOUSE_RIGHT);
+    }
+
+    private void setState(State next) {
+        if (next == null) {
+            dispose();
+            if (completeOverriding) {
+                ControlOverrider.endCompleteOverride();
+                completeOverriding = false;
+            }
+        } else {
+            if (current != null && current.handlesKeyInput() && completeOverriding) {
+                ControlOverrider.endCompleteOverride();
+                completeOverriding = false;
+            }
+            if (next.handlesKeyInput() && !completeOverriding) {
+                ControlOverrider.startCompleteOverride();
+                completeOverriding = true;
+            }
+        }
+        current = next;
+    }
+
+    private static String local(String key) {
+        return I18n.get("app.academy.freq_transmitter." + key);
+    }
+
+    @Override
+    public void onDisposed() {
+        MinecraftForge.EVENT_BUS.unregister(this);
+        ControlOverrider.endOverride(OVERRIDE_GROUP);
+        if (completeOverriding) {
+            ControlOverrider.endCompleteOverride();
+            completeOverriding = false;
+        }
+        FreqTransmitterResultMessage.clearPending();
+    }
+
+    @Override
+    public void draw(GuiGraphics gg, float width, float height) {
+        HudUtils.setPose(gg.pose());
+
+        AppFreqTransmitter app = AppFreqTransmitter.instance;
+
+        {
+            final float x0 = 15, y0 = 15, isize = 18;
+            final FontOption option = new FontOption(10);
+            String str = app.getDisplayName();
+            double len = font.getTextWidth(str, option);
+
+            drawBox(x0, y0, 30 + len, 18);
+
+            RenderSystem.setShaderColor(1, 1, 1, 1);
+            HudUtils.loadTexture(app.getIcon());
+            HudUtils.rect(x0 + 2, y0, isize, isize);
+
+            font.draw(str, x0 + isize + 6, y0 + 4, option);
+        }
+
+        current.handleDraw(width, height);
+
+        long dt = current.getDeltaTime();
+        if (dt > current.timeout) {
+            setState(new StateNotifyAndQuit("st"));
+        }
+
+        RenderSystem.setShaderColor(1, 1, 1, 1);
+    }
+
+    private static void drawBox(double x, double y, double width, double height) {
+        Colors.bindToGL(BG_COLOR);
+        HudUtils.colorRect(x, y, width, height);
+        ACRenderingHelper.drawGlow(x, y, width, height, GLOW_SIZE, GLOW_COLOR);
+    }
+
+    private void drawTextBox(String str, float x, float y) {
+        final float trimLength = 120;
+        final FontOption option = new FontOption(10);
+        Extent extent = font.drawSeperated_Sim(str, trimLength, option);
+        final float MARGIN = 5;
+
+        drawBox(x, y, MARGIN * 2 + extent.width + 25, MARGIN * 2 + extent.height);
+        font.drawSeperated(str, x + MARGIN, y + MARGIN, trimLength, option);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onMouse(InputEvent.MouseButton.Pre event) {
+        if (disposed || current == null || !cn.lambdalib2.datapart.EntityData.isLocalPlayerReady()) return;
+        if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT && event.getAction() == GLFW.GLFW_PRESS) {
+            current.handleClicking(raytrace());
+        }
+    }
+
+    @SubscribeEvent
+    public void onKey(InputEvent.Key event) {
+        if (disposed || current == null || !cn.lambdalib2.datapart.EntityData.isLocalPlayerReady()) return;
+        if (event.getAction() == GLFW.GLFW_RELEASE) return;
+        if (!current.handlesKeyInput()) return;
+
+        int key = event.getKey();
+        char ch = resolveChar(key, event.getScanCode(), event.getModifiers());
+        current.handleKeyInput(ch, key);
+
+        ControlOverrider.suppressAllNow();
+    }
+
+    private static char resolveChar(int key, int scancode, int mods) {
+        if (key == GLFW.GLFW_KEY_SPACE) return ' ';
+        String name = GLFW.glfwGetKeyName(key, scancode);
+        if (name != null && name.length() == 1) {
+            char c = name.charAt(0);
+            if ((mods & GLFW.GLFW_MOD_SHIFT) != 0) c = applyShift(c);
+            return c;
+        }
+        return '\0';
+    }
+
+    private static char applyShift(char c) {
+        if (c >= 'a' && c <= 'z') return Character.toUpperCase(c);
+        return switch (c) {
+            case '1' -> '!'; case '2' -> '@'; case '3' -> '#'; case '4' -> '$'; case '5' -> '%';
+            case '6' -> '^'; case '7' -> '&'; case '8' -> '*'; case '9' -> '('; case '0' -> ')';
+            case '-' -> '_'; case '=' -> '+'; case '[' -> '{'; case ']' -> '}'; case '\\' -> '|';
+            case ';' -> ':'; case '\'' -> '"'; case ',' -> '<'; case '.' -> '>'; case '/' -> '?';
+            case '`' -> '~';
+            default -> c;
+        };
+    }
+
+    private BlockHitResult raytrace() {
+        Vec3 eye = player.getEyePosition(1.0f);
+        Vec3 end = eye.add(player.getViewVector(1.0f).scale(REACH));
+        BlockHitResult hit = level.clip(new ClipContext(
+                eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
+        return hit.getType() == HitResult.Type.BLOCK ? hit : null;
+    }
+
+    private BlockEntity resolve(BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be != null) return be;
+        if (level.getBlockState(pos).getBlock() instanceof ACMultiBlock) {
+            return ACMultiBlock.getOriginTile(level, pos);
+        }
+        return null;
+    }
+
     private abstract class State {
-        
-        boolean handlesKey;
+        final boolean handlesKey;
         final double createTime;
         long timeout = 20000;
-        
-        public State(boolean _handlesKey) {
-            handlesKey = _handlesKey;
-            createTime = GameTimer.getTime();
+
+        State(boolean handlesKey) {
+            this.handlesKey = handlesKey;
+            this.createTime = GameTimer.getTime();
         }
-        
+
         final boolean handlesKeyInput() {
             return handlesKey;
         }
-        
+
         abstract void handleDraw(float w, float h);
-        abstract void handleClicking(RayTraceResult result);
-        
-        void handleKeyInput(char ch, int kid) {}
-        
+
+        abstract void handleClicking(BlockHitResult result);
+
+        void handleKeyInput(char ch, int key) {}
+
         final long getDeltaTime() {
             return (long) ((GameTimer.getTime() - createTime) * 1000);
         }
@@ -147,474 +246,240 @@ public class FreqTransmitterUI extends AuxGui {
             timeout = 3000;
         }
     }
-    
-    private static final Color
-        BG_COLOR = Colors.fromHexColor(0x77272727),
-        GLOW_COLOR = Colors.fromHexColor(0xaaffffff);
-    
-    private static final double GLOW_SIZE = 1;
 
-    final IFont font = Resources.font();
-    
-    EntityPlayer player;
-    World world;
-    
-    State current;
-    
-    KeyEventDispatcher keyDispatcher;
-    
-    public FreqTransmitterUI() {
-        player = Minecraft.getMinecraft().player;
-        world = player.world;
-        consistent = false;
-        
-        MinecraftForge.EVENT_BUS.register(keyDispatcher = new KeyEventDispatcher());
-        
-        setState(new StateStart());
-
-        ControlOverrider.override(OVERRIDE_GROUP, KeyManager.MOUSE_LEFT, KeyManager.MOUSE_RIGHT);
-    }
-    
-    private void setState(State next) {
-        if(next == null) {
-            this.dispose();
-            
-            if(current.handlesKeyInput()) {
-                ControlOverrider.endCompleteOverride();
-            }
-        } else {
-            if(current != null && current.handlesKeyInput()) {
-                ControlOverrider.endCompleteOverride();
-            }
-            if(next.handlesKeyInput()) {
-                ControlOverrider.startCompleteOverride();
-            }
-        }
-        current = next;
-    }
-
-    @SideOnly(Side.CLIENT)
-    private String local(String key) {
-        return I18n.format("ac.app.freq_transmitter." + key);
-    }
-    
-    @Override
-    public void onDisposed() {
-        keyDispatcher.setDead();
-
-        ControlOverrider.endOverride(OVERRIDE_GROUP);
-    }
-
-    @Override
-    public void draw(ScaledResolution sr) {
-        float width = (float) sr.getScaledWidth_double(), height = (float) sr.getScaledHeight_double();
-        
-        AppFreqTransmitter app = AppFreqTransmitter.instance;
-        GL11.glPushMatrix(); {
-            
-            GL11.glTranslated(15, 15, 0);
-            
-            final float isize = 18;
-            final FontOption option = new FontOption(10);
-
-            String str = app.getDisplayName();
-            double len = font.getTextWidth(str, option);
-            
-            drawBox(0, 0, 30 + len, 18);
-            
-            ResourceLocation icon = app.getIcon();
-            RenderUtils.loadTexture(icon);
-            GL11.glColor4d(1, 1, 1, 1);
-            HudUtils.rect(2, 0, isize, isize);
-            
-            font.draw(str, isize + 6, 4, option);
-        
-        } GL11.glPopMatrix();
-        
-        current.handleDraw(width, height);
-
-        long dt = current.getDeltaTime();
-        if (dt > current.timeout) {
-            setState(new StateNotifyAndQuit("st"));
-        }
-        
-        GL11.glColor4d(1, 1, 1, 1);
-    }
-    
-    private static void drawBox(double x, double y, double width, double height) {
-        Colors.bindToGL(BG_COLOR);
-        HudUtils.colorRect(x, y, width, height);
-        
-        ACRenderingHelper.drawGlow(x, y, width, height, GLOW_SIZE, GLOW_COLOR);
-    }
-     
-    private void drawTextBox(String str, float x, float y) {
-        final float trimLength = 120;
-        final FontOption option = new FontOption(10);
-        Extent extent = font.drawSeperated_Sim(str, trimLength, option);
-        final float X0 = x, Y0 = y, MARGIN = 5;
-        
-        drawBox(X0, Y0, MARGIN * 2 + extent.width + 25, MARGIN * 2 + extent.height);
-        font.drawSeperated(str, X0 + MARGIN, Y0 + MARGIN, trimLength, option);
-    }
-    
-    private class KeyEventDispatcher{//} extends LIHandler<InputEvent> {
-
-        @SubscribeEvent
-        protected boolean onEvent(InputEvent event) {
-            if(current != null) {
-                if(event instanceof MouseInputEvent) {
-                    int mid = Mouse.getEventButton();
-                    if(mid == 1 && Mouse.getEventButtonState()) {
-                        current.handleClicking(Raytrace.traceLiving(player, 4, EntitySelectors.nothing()));
-                    }
-                } else {
-                    if(Keyboard.getEventKeyState()) {
-                        if(current.handlesKeyInput())
-                            current.handleKeyInput(Keyboard.getEventCharacter(), Keyboard.getEventKey());
-                    }
-                }
-            } else {
-                AcademyCraft.log.error("Human is dead. Mismatch.");
-                MinecraftForge.EVENT_BUS.unregister(this);
-            }
-            return true;
-        }
-
-        protected void setDead()
-        {
-            MinecraftForge.EVENT_BUS.unregister(this);
-        }
-        
-    }
-    
-    // STATES
-    
     private class StateNotify extends State {
-        
         final String key;
-        
-        public StateNotify(String _key) {
+
+        StateNotify(String key) {
             super(false);
-            key = _key;
+            this.key = key;
         }
-        
-        @Override
-        public void handleDraw(float w, float h) {
+
+        @Override void handleDraw(float w, float h) {
             drawTextBox(local(key), w / 2 + 10, h / 2 + 10);
         }
 
-        @Override
-        void handleClicking(RayTraceResult result) {}
-        
+        @Override void handleClicking(BlockHitResult result) {}
     }
-    
+
     private class StateNotifyAndQuit extends StateNotify {
-        
-        public StateNotifyAndQuit(String _key) {
-            super(_key);
-        }
-        
-        @Override
-        public void handleDraw(float w, float h) {
+        StateNotifyAndQuit(String key) { super(key); }
+
+        @Override void handleDraw(float w, float h) {
             super.handleDraw(w, h);
-            if(this.getDeltaTime() > 1000L) {
-                dispose();
-            }
+            if (getDeltaTime() > 1000L) dispose();
         }
-        
     }
-    
+
     private class StateNotifyAndReturn extends StateNotify {
         final State toSwitch;
-        
-        public StateNotifyAndReturn(String _key, State _toSwitch) {
-            super(_key);
-            toSwitch = _toSwitch;
-        }
-        
-        @Override
-        public void handleDraw(float w, float h) {
-            super.handleDraw(w, h);
-            if(this.getDeltaTime() > 700L) {
-                setState(toSwitch);
-            }
-        }
-    }
-    
-    // S0
-    private class StateStart extends State {
-        
-        boolean started = false;
-        
-        public StateStart() {
-            super(false);
+
+        StateNotifyAndReturn(String key, State toSwitch) {
+            super(key);
+            this.toSwitch = toSwitch;
         }
 
-        @Override
-        public void handleDraw(float w, float h) {
+        @Override void handleDraw(float w, float h) {
+            super.handleDraw(w, h);
+            if (getDeltaTime() > 700L) setState(toSwitch);
+        }
+    }
+
+    private class StateStart extends State {
+        boolean started = false;
+
+        StateStart() { super(false); }
+
+        @Override void handleDraw(float w, float h) {
             drawTextBox(local("s0_0"), w / 2 + 10, h / 2 + 10);
         }
 
-        @Override
-        public void handleClicking(RayTraceResult result) {
-            if(result == null) {
+        @Override void handleClicking(BlockHitResult result) {
+            if (result == null) {
                 setState(null);
                 return;
             }
-            if(started)
-                return;
-//            int hx = result.blockX,
-//                    hy = result.blockY,
-//                    hz = result.blockZ;
-            TileEntity te = world.getTileEntity(result.getBlockPos());
-            if(te instanceof IWirelessNode) {
-                
-                setState(new StateAuthorizeNode((IWirelessNode) te));
-                
-            } else if(te instanceof IWirelessMatrix) {
-                
+            if (started) return;
+
+            BlockEntity te = resolve(result.getBlockPos());
+            if (te instanceof IWirelessNode) {
+                setState(new StateAuthorizeNode((IWirelessNode) te, te.getBlockPos()));
+            } else if (te instanceof IWirelessMatrix) {
                 started = true;
-                IWirelessMatrix mat = (IWirelessMatrix) te;
-                // Hard coded BlockMulti processing
-                Block block = world.getBlockState(result.getBlockPos()).getBlock();
-                if(block instanceof BlockMulti) {
-                    mat = (IWirelessMatrix) ((BlockMulti)block).getOriginTile(te);
-                    if(mat == null) {
-                        setState(new StateNotifyAndQuit("e0"));
-                        return;
-                    }
-                }
-                
-                final IWirelessMatrix mat2 = mat;
+                BlockPos matrixPos = te.getBlockPos();
                 startTransmitting();
-                Syncs.querySSID(mat, Future.create(ssid -> {
-                    if(current == StateStart.this) {
-                        if(ssid == null) {
-                            setState(new StateNotifyAndQuit("e0"));
-                        } else {
-                            setState(new StateAuthorize(mat2, ssid));
-                        }
-                    }
-                }));
+                FreqTransmitterActionMessage.send(FreqTransmitterActionMessage.QUERY_SSID,
+                        matrixPos, BlockPos.ZERO, "", (success, ssid) -> {
+                            if (current == StateStart.this) {
+                                if (!success) {
+                                    setState(new StateNotifyAndQuit("e0"));
+                                } else {
+                                    setState(new StateAuthorize(matrixPos, ssid));
+                                }
+                            }
+                        });
             } else {
                 setState(new StateNotifyAndQuit("e4"));
             }
         }
-        
     }
-    
-    // S1
+
     private class StateAuthorize extends State {
-        
-        final IWirelessMatrix matrix;
+        final BlockPos matrixPos;
         final String ssid;
         String pass = "";
 
-        public StateAuthorize(IWirelessMatrix _matrix, String _ssid) {
+        StateAuthorize(BlockPos matrixPos, String ssid) {
             super(true);
-            matrix = _matrix;
-            ssid = _ssid;
+            this.matrixPos = matrixPos;
+            this.ssid = ssid;
         }
 
-        @Override
-        void handleDraw(float w, float h) {
-            GL11.glPushMatrix();
-            GL11.glTranslated(w / 2 + 10, h / 2 - 10, 0);
-            
-            drawBox(0, 0, 140, 40);
-            
-            StringBuilder sb = new StringBuilder();
-            for(int i = 0; i < pass.length(); ++i)
-                sb.append('*');
-            
-            font.draw(String.format("SSID: %s", ssid), 10, 5, new FontOption(10, 0xffbfbfbf));
-            font.draw(String.format("PASS: %s", sb.toString()), 10, 15, new FontOption(10, 0xffffffff));
-            font.draw(local("s1_0"), 10, 25, new FontOption(10, 0xff30ffff));
-            GL11.glPopMatrix();
+        @Override void handleDraw(float w, float h) {
+            drawPasswordBox(w, h, "SSID: " + ssid, pass, local("s1_0"));
         }
 
-        @Override
-        void handleClicking(RayTraceResult result) {
-            // NO-OP
-        }
-        
-        @Override
-        void handleKeyInput(char ch, int kid) {
-            if(ChatAllowedCharacters.isAllowedCharacter(ch)) {
-                pass = pass + ch;
-            } else if(kid == Keyboard.KEY_RETURN) {
+        @Override void handleClicking(BlockHitResult result) {}
+
+        @Override void handleKeyInput(char ch, int key) {
+            if (SharedConstants.isAllowedChatCharacter(ch)) {
+                pass += ch;
+            } else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
                 State state = new StateNotify("s1_1");
                 setState(state);
                 state.startTransmitting();
-                Syncs.authorizeMatrix(matrix, pass, Future.create(result -> {
-                    if(state == FreqTransmitterUI.this.current) {
-                        if(result) {
-                            setState(new StateDoMatrixLink(matrix, pass));
-                        } else {
-                            setState(new StateNotifyAndQuit("e1"));
-                        }
-                    }
-                }));
-            } else if(kid == Keyboard.KEY_BACK) {
-                if(pass.length() > 0)
-                    pass = pass.substring(0, pass.length() - 1);
+                FreqTransmitterActionMessage.send(FreqTransmitterActionMessage.AUTH_MATRIX,
+                        matrixPos, BlockPos.ZERO, pass, (success, ignored) -> {
+                            if (state == current) {
+                                if (success) setState(new StateDoMatrixLink(matrixPos, pass));
+                                else setState(new StateNotifyAndQuit("e1"));
+                            }
+                        });
+            } else if (key == GLFW.GLFW_KEY_BACKSPACE) {
+                if (!pass.isEmpty()) pass = pass.substring(0, pass.length() - 1);
             }
         }
-        
     }
 
     private class StateAuthorizeNode extends State {
-
-        final IWirelessNode node;
+        final BlockPos nodePos;
         final String name;
         String pass = "";
 
-        public StateAuthorizeNode(IWirelessNode _node) {
+        StateAuthorizeNode(IWirelessNode node, BlockPos nodePos) {
             super(true);
-            node = _node;
-            name = node.getNodeName();
+            this.nodePos = nodePos;
+            this.name = node.getNodeName();
         }
 
-        @Override
-        void handleDraw(float w, float h) {
-            GL11.glPushMatrix();
-            GL11.glTranslated(w / 2 + 10, h / 2 - 10, 0);
+        @Override void handleDraw(float w, float h) {
 
-            drawBox(0, 0, 140, 40);
-
-            StringBuilder sb = new StringBuilder();
-            for(int i = 0; i < pass.length(); ++i)
-                sb.append('*');
-
-            font.draw(String.format("NAME: %s", name), 10, 5, new FontOption(10, 0xffbfbfbf));
-            font.draw(String.format("PASS: %s", sb.toString()), 10, 15, new FontOption(10, 0xffffffff));
-            font.draw(local("s1_1"), 10, 25, new FontOption(10, 0xff30ffff));
-            GL11.glPopMatrix();
+            drawPasswordBox(w, h, "NAME: " + name, pass, local("s1_0"));
         }
 
-        @Override
-        void handleClicking(RayTraceResult result) {
-            // NO-OP
-        }
+        @Override void handleClicking(BlockHitResult result) {}
 
-        @Override
-        void handleKeyInput(char ch, int kid) {
-            if(ChatAllowedCharacters.isAllowedCharacter(ch)) {
-                pass = pass + ch;
-            } else if(kid == Keyboard.KEY_RETURN) {
+        @Override void handleKeyInput(char ch, int key) {
+            if (SharedConstants.isAllowedChatCharacter(ch)) {
+                pass += ch;
+            } else if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
                 State state = new StateNotify("s1_1");
                 setState(state);
                 state.startTransmitting();
-                Syncs.authorizeNode(node, pass, Future.create(result -> {
-                    if(state == FreqTransmitterUI.this.current) {
-                        if(result) {
-                            setState(new StateDoNodeLink(node, pass));
-                        } else {
-                            setState(new StateNotifyAndQuit("e1"));
-                        }
-                    }
-                }));
-            } else if(kid == Keyboard.KEY_BACK) {
-                if(pass.length() > 0)
-                    pass = pass.substring(0, pass.length() - 1);
+                FreqTransmitterActionMessage.send(FreqTransmitterActionMessage.AUTH_NODE,
+                        nodePos, BlockPos.ZERO, pass, (success, ignored) -> {
+                            if (state == current) {
+                                if (success) setState(new StateDoNodeLink(nodePos, pass));
+                                else setState(new StateNotifyAndQuit("e1"));
+                            }
+                        });
+            } else if (key == GLFW.GLFW_KEY_BACKSPACE) {
+                if (!pass.isEmpty()) pass = pass.substring(0, pass.length() - 1);
             }
         }
-
     }
-    
-    //S2
-    private class StateDoMatrixLink extends State {
 
-        final IWirelessMatrix matrix;
+    private void drawPasswordBox(float w, float h, String head, String pass, String hint) {
+        float x = w / 2 + 10, y = h / 2 - 10;
+        drawBox(x, y, 140, 40);
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < pass.length(); ++i) sb.append('*');
+
+        font.draw(head, x + 10, y + 5, new FontOption(10, 0xffbfbfbf));
+        font.draw("PASS: " + sb, x + 10, y + 15, new FontOption(10, 0xffffffff));
+        font.draw(hint, x + 10, y + 25, new FontOption(10, 0xff30ffff));
+    }
+
+    private class StateDoMatrixLink extends State {
+        final BlockPos matrixPos;
         final String pass;
-        
-        public StateDoMatrixLink(IWirelessMatrix _matrix, String _pass) {
+
+        StateDoMatrixLink(BlockPos matrixPos, String pass) {
             super(false);
-            matrix = _matrix;
-            pass = _pass;
+            this.matrixPos = matrixPos;
+            this.pass = pass;
         }
 
-        @Override
-        void handleDraw(float w, float h) {
+        @Override void handleDraw(float w, float h) {
             drawTextBox(local("s2_0"), w / 2 + 10, h / 2 + 10);
         }
 
-        @Override
-        void handleClicking(RayTraceResult result) {
-            TileEntity tile;
-            
-            if(result == null || 
-                !((tile = world.getTileEntity(result.getBlockPos())) instanceof IWirelessNode)) {
+        @Override void handleClicking(BlockHitResult result) {
+            BlockEntity te;
+            if (result == null || !((te = resolve(result.getBlockPos())) instanceof IWirelessNode)) {
                 setState(new StateNotifyAndQuit("e4"));
             } else {
-                IWirelessNode node = (IWirelessNode) tile;
+                BlockPos nodePos = te.getBlockPos();
                 State state = new StateNotify("e5");
                 setState(state);
                 state.startTransmitting();
-                Syncs.linkNodeToMatrix(node, matrix, pass, Future.create(res -> {
-                    if(FreqTransmitterUI.this.current == state) {
-                        if(res) {
-                            setState(new StateNotifyAndReturn("e6", StateDoMatrixLink.this));
-                        } else {
-                            setState(new StateNotifyAndQuit("e2"));
-                        }
-                    }
-                }));
+                FreqTransmitterActionMessage.send(FreqTransmitterActionMessage.LINK_NODE,
+                        nodePos, matrixPos, pass, (success, ignored) -> {
+                            if (current == state) {
+                                if (success) setState(new StateNotifyAndReturn("e6", StateDoMatrixLink.this));
+                                else setState(new StateNotifyAndQuit("e2"));
+                            }
+                        });
             }
         }
-        
     }
-    
-    //S3
-    private class StateDoNodeLink extends State {
-        
-        IWirelessNode node;
-        String pass;
 
-        public StateDoNodeLink(IWirelessNode _node, String _pass) {
+    private class StateDoNodeLink extends State {
+        final BlockPos nodePos;
+        final String pass;
+
+        StateDoNodeLink(BlockPos nodePos, String pass) {
             super(false);
-            node = _node;
-            pass = _pass;
+            this.nodePos = nodePos;
+            this.pass = pass;
         }
 
-        @Override
-        void handleDraw(float w, float h) {
+        @Override void handleDraw(float w, float h) {
             drawTextBox(local("s3_0"), w / 2 + 10, h / 2 + 10);
         }
 
-        @Override
-        void handleClicking(RayTraceResult r) {
-            TileEntity tile;
-            if(r == null || (tile = world.getTileEntity(r.getBlockPos())) == null) {
+        @Override void handleClicking(BlockHitResult result) {
+            BlockEntity te;
+            if (result == null || (te = resolve(result.getBlockPos())) == null) {
                 setState(new StateNotifyAndQuit("e4"));
                 return;
             }
-            
-            Block block = tile.getBlockType();
-            if(block instanceof BlockMulti) {
-                tile = ((BlockMulti) block).getOriginTile(tile);
-            }
-            
-            if(tile instanceof IWirelessUser) {
+            if (te instanceof IWirelessUser) {
+                BlockPos userPos = te.getBlockPos();
                 State state = new StateNotify("e5");
                 setState(state);
                 state.startTransmitting();
-                Syncs.linkUserToNode((IWirelessUser) tile, node, Future.create(res -> {
-                    if(FreqTransmitterUI.this.current == state) {
-                        if(res) {
-                            setState(new StateNotifyAndReturn("e6", StateDoNodeLink.this));
-                        } else {
-                            setState(new StateNotifyAndQuit("e3"));
-                        }
-                    }
-                }));
+                FreqTransmitterActionMessage.send(FreqTransmitterActionMessage.LINK_USER,
+                        userPos, nodePos, "", (success, ignored) -> {
+                            if (current == state) {
+                                if (success) setState(new StateNotifyAndReturn("e6", StateDoNodeLink.this));
+                                else setState(new StateNotifyAndQuit("e3"));
+                            }
+                        });
             } else {
                 setState(new StateNotifyAndQuit("e4"));
             }
         }
-        
     }
-
-
 }

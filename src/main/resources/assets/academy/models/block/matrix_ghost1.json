@@ -1,0 +1,10 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/matrix_ghost1.obj",
+  "flip_v": true,
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "matrix": "academy:block/transparent",
+    "particle": "academy:item/matrix"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "cn.academy.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "academy.refmap.json",
+  "mixins": [
+    "EnderDragonMixin",
+    "EnderDragonPhaseAccessor",
+    "EntityAccessor",
+    "EntityMixin",
+    "LevelMixin",
+    "LivingEntityMixin",
+    "LivingDeadAccessor",
+    "LivingLifeAccessor",
+    "ServerPlayerMixin",
+    "PhantomAccessor",
+    "PlayerListAccessor",
+    "PlayerMixin",
+    "SlimeMoveControlAccessor",
+    "ServerGamePacketListenerImplMixin",
+    "SyncedDataAccessor",
+    "VettoreMixin",
+    "WardenMixin"
+  ],
+  "client": [
+    "client.AbstractContainerScreenMixin",
+    "client.AgeableListModelMixin",
+    "client.CameraMixin",
+    "client.ClientPacketListenerMixin",
+    "client.ClientLevelMixin",
+    "client.GameRendererAccessor",
+    "client.GameRendererMixin",
+    "client.EntityRenderDispatcherMixin",
+    "client.HumanoidArmorLayerMixin",
+    "client.HumanoidModelMixin",
+    "client.ItemInHandRendererMixin",
+    "client.KeyboardHandlerMixin",
+    "client.LivingEntityRendererMixin",
+    "client.LevelRendererAccessor",
+    "client.LevelRendererMixin",
+    "client.LocalPlayerMixin",
+    "client.MinecraftMixin",
+    "client.ParticleAccessor",
+    "client.ParticleEngineMixin",
+    "client.PlayerRendererMixin",
+    "client.ScreenEffectRendererMixin",
+    "client.SoundEngineMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

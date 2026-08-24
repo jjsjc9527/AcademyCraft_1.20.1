@@ -1,75 +1,77 @@
 package cn.academy.ability.vanilla.teleporter.skill;
 
+import cn.academy.util.AimTrace;
+import cn.academy.ACSounds;
+import cn.academy.Resources;
 import cn.academy.ability.Skill;
+import cn.academy.ability.context.ClientContext;
 import cn.academy.ability.context.ClientRuntime;
-import cn.academy.ability.context.ClientRuntime.ActivateHandlers;
-import cn.academy.ability.context.ClientRuntime.IActivateHandler;
 import cn.academy.ability.context.Context;
 import cn.academy.ability.context.ContextManager;
 import cn.academy.ability.context.KeyDelegate;
-import cn.academy.event.ability.FlushControlEvent;
-import cn.academy.Resources;
-import cn.academy.client.sound.ACSounds;
-import cn.academy.entity.EntityTPMarking;
+import cn.academy.ability.context.RegClientContext;
+import cn.academy.ability.vanilla.teleporter.skill.PenetrateTeleport.Dest;
 import cn.academy.ability.vanilla.teleporter.util.GravityCancellor;
-import cn.academy.ability.vanilla.teleporter.util.TPSkillHelper;
+import cn.academy.client.render.entity.ACEffectEntities;
+import cn.academy.config.AbilityConfig;
+import cn.academy.entity.EntityTPMarking;
+import cn.academy.event.ability.FlushControlEvent;
+import cn.academy.gravity.ACGravity;
+import cn.academy.gravity.RotationUtil;
 import cn.lambdalib2.s11n.network.NetworkMessage.Listener;
-import cn.lambdalib2.util.EntitySelectors;
-import cn.lambdalib2.util.MathUtils;
-import cn.lambdalib2.util.Raytrace;
-import cn.lambdalib2.util.VecUtils;
-import com.google.common.base.Preconditions;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.settings.GameSettings;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.LogicalSide;
 
 import java.util.Optional;
 
-import static cn.lambdalib2.util.MathUtils.lerpf;
-
-
-/**
- * @author WeAthFolD
- */
 public class Flashing extends Skill {
 
-    public static final Flashing instance = new Flashing();
+    public static final Flashing INSTANCE = new Flashing();
 
-    private static final String
-            MSG_PERFORM = "perform",
-            KEY_GROUP = "TP_Flashing";
+    static final String MSG_PERFORM = "perform";
 
-    private Flashing() {
+    static final String KEY_GROUP = "TP_Flashing";
+
+    static final String[] KEY_ICONS = {null, "a", "d", "w", "s"};
+
+    public Flashing() {
         super("flashing", 5);
     }
 
-    @SideOnly(Side.CLIENT)
     @Override
+    @net.minecraftforge.api.distmarker.OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
     public void activate(ClientRuntime rt, int keyID) {
         rt.addKey(keyID, new KeyDelegate() {
             @Override
             public void onKeyDown() {
-                Optional<MainContext> opt = ContextManager.instance.find(MainContext.class);
-                if (!opt.isPresent()) {
-                    ContextManager.instance.activate(new MainContext(getPlayer()));
-                } else {
-                    opt.get().terminate();
-                }
 
+                Optional<MainContext> opt = ContextManager.instance.findLocal(MainContext.class);
+                if (opt.isPresent()) {
+                    opt.get().terminate();
+                } else {
+                    ContextManager.instance.activate(new MainContext(getPlayer()));
+                }
                 MinecraftForge.EVENT_BUS.post(new FlushControlEvent());
             }
 
             @Override
             public ResourceLocation getIcon() {
-                return instance.getHintIcon();
+                return INSTANCE.getHintIcon();
             }
 
             @Override
@@ -77,295 +79,334 @@ public class Flashing extends Skill {
                 return 0;
             }
 
+            @Override
             public Skill getSkill() {
-                return instance;
+                return INSTANCE;
             }
         });
     }
 
-    private static final Vec3d[] dirs = new Vec3d[] {
-            null,
-            new Vec3d(0, 0, -1),
-            new Vec3d(0, 0, 1),
-            new Vec3d(1, 0, 0),
-            new Vec3d(-1, 0, 0)
-    };
+    public static class MainContext extends Context<Flashing> {
 
-    public static class MainContext extends Context {
+        final float exp = ctx.getSkillExp();
 
-        int performingKey = -1;
+        final float consumption = AbilityConfig.cp("flashing", exp);
 
-        @SideOnly(Side.CLIENT)
-        EntityTPMarking marking;
+        final float overloadStart = AbilityConfig.overload("flashing", exp);
+        final float cpStart = AbilityConfig.stat("flashing", "cp_start", exp);
+        final int cooldownTime = (int) AbilityConfig.cooldown("flashing", exp);
+        final double flashDist = AbilityConfig.stat("flashing", "distance", exp);
 
-        @SideOnly(Side.CLIENT)
-        GravityCancellor cancellor;
+        private float overloadKeep;
 
-        @SideOnly(Side.CLIENT)
-        IActivateHandler activateHandler;
-
-        final float exp, consumption;
-        final float overload_start, consumption_start;
-        final int cooldown_time;
-        float overloadKeep;
-        final int max_time;
-        int ticks = 0;
-
-        public MainContext(EntityPlayer player) {
-            super(player, instance);
-
-            exp = ctx.getSkillExp();
-            consumption = lerpf(13, 6, exp);
-            overload_start = lerpf(250, 180, exp);
-            consumption_start = lerpf(80, 60, exp);
-            max_time = (int) lerpf(60, 150, exp);
-            cooldown_time = (int) lerpf(900, 400, exp);
+        public MainContext(Player player) {
+            super(player, INSTANCE);
         }
 
-        @Listener(channel=Context.MSG_MADEALIVE, side=Side.SERVER)
-        void serverMadeAlive() {
-            if(!ctx.consume(overload_start, consumption_start)) terminate(); else {
+        @Listener(channel = MSG_MADEALIVE, side = LogicalSide.SERVER)
+        private void s_madeAlive() {
+            if (!ctx.consume(overloadStart, cpStart)) {
+                terminate();
+            } else {
                 overloadKeep = ctx.cpData.getOverload();
             }
         }
 
-        @SideOnly(Side.CLIENT)
-        @Listener(channel=Context.MSG_MADEALIVE, side=Side.CLIENT)
-        void localMakeAlive() {
-            if (isLocal()) {
-                activateHandler = ActivateHandlers.terminatesContext(this);
-                clientRuntime().addActivateHandler(activateHandler);
-
-                final String[] strs = new String[] { null, "a", "d", "w", "s"};
-                Minecraft mc = Minecraft.getMinecraft();
-                GameSettings settings = mc.gameSettings;
-                final int[] keys = new int[] {
-                    -1,
-                    settings.keyBindLeft.getKeyCode(),
-                    settings.keyBindRight.getKeyCode(),
-                    settings.keyBindForward.getKeyCode(),
-                    settings.keyBindBack.getKeyCode()
-                };
-                for (int i = 0; i < 4; ++i) {
-                    final int localid = i + 1;
-                    clientRuntime().addKey(KEY_GROUP, keys[localid], new KeyDelegate() {
-                        @Override
-                        public void onKeyDown() {
-                            localStart(localid);
-                        }
-                        @Override
-                        public void onKeyUp() {
-                            localEnd(localid);
-                        }
-                        @Override
-                        public void onKeyAbort() {
-                            localAbort(localid);
-                        }
-                        @Override
-                        public ResourceLocation getIcon() {
-                            return Resources.getTexture("abilities/teleporter/flashing/" + strs[localid]);
-                        }
-
-                        @Override
-                        public int createID() {
-                            return localid;
-                        }
-
-                        public Skill getSkill() {
-                            return instance;
-                        }
-                    });
-                }
+        @Listener(channel = MSG_TICK, side = LogicalSide.SERVER)
+        private void s_tick() {
+            if (ctx.cpData.getOverload() < overloadKeep) {
+                ctx.cpData.setOverload(overloadKeep);
+            }
+            if (!ctx.cpData.canUseAbility() || !ctx.canConsumeCP(consumption)) {
+                terminate();
             }
         }
 
-        @SideOnly(Side.CLIENT)
-        void localStart(int keyid) {
-            performingKey = keyid;
+        @Listener(channel = MSG_PERFORM, side = LogicalSide.SERVER)
+        private void s_perform(int keyid) {
+            if (keyid < 1 || keyid > 4) {
+                return;
+            }
+            Dest dest = getDest(keyid);
+            if (!dest.available || !ctx.consume(0, consumption)) {
+                return;
+            }
+            if (player.isPassenger()) {
+                player.stopRiding();
+            }
 
-            startEffects();
+            ((ServerPlayer) player).connection.teleport(
+                    dest.pos.x, dest.pos.y, dest.pos.z, player.getYRot(), player.getXRot());
+            player.fallDistance = 0.0f;
+            ctx.addSkillExp(0.002f);
+
+            player.level().playSound(player, dest.pos.x, dest.pos.y, dest.pos.z,
+                    ACSounds.TP_MOVE_PLAYER.get(), SoundSource.AMBIENT, 1.0f, 1.0f);
+            sendToClient(MSG_PERFORM);
         }
 
-        @SideOnly(Side.CLIENT)
-        void localEnd(int keyid) {
-            if (keyid != performingKey) {
+        @Listener(channel = MSG_TERMINATED, side = LogicalSide.SERVER)
+        private void s_terminated() {
+            ctx.setCooldown(cooldownTime);
+        }
+
+        boolean hasPlace(Level world, Vec3 feet) {
+            AABB bb = player.getBoundingBox();
+            AABB at = bb.move(feet.x - player.getX(), feet.y - player.getY(), feet.z - player.getZ());
+            return world.noCollision(player, at.deflate(0.05));
+        }
+
+        Vec3 dirOf(int keyid) {
+            Vec3 look = player.getLookAngle().normalize();
+            Direction g = ACGravity.getGravityDirection(player);
+            Vec3 up = RotationUtil.vecPlayerToWorld(new Vec3(0, 1, 0), g);
+            Vec3 right = look.cross(up);
+            if (right.lengthSqr() < 1.0e-6) {
+                right = RotationUtil.vecPlayerToWorld(
+                        RotationUtil.rotToVec(player.getYRot(), 0), g).cross(up);
+            }
+            right = right.normalize();
+            switch (keyid) {
+                case 1: return right.scale(-1);
+                case 2: return right;
+                case 3: return look;
+                default: return look.scale(-1);
+            }
+        }
+
+        public Dest getDest(int keyid) {
+            Level world = player.level();
+            Vec3 eye = player.getEyePosition(1.0f);
+            Vec3 dir = dirOf(keyid);
+            Vec3 end = eye.add(dir.scale(flashDist));
+
+            BlockHitResult block = world.clip(new ClipContext(
+                    eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+            Vec3 clipEnd = block.getType() == HitResult.Type.BLOCK ? block.getLocation() : end;
+
+            EntityHitResult ent = AimTrace.firstResult(world, player, eye, clipEnd,
+                    e -> e != player && e.isAlive() && e instanceof LivingEntity);
+
+            Vec3 feet = null;
+            if (ent != null) {
+                Entity t = ent.getEntity();
+                feet = new Vec3(t.getX(), t.getBoundingBox().maxY, t.getZ());
+            } else if (block.getType() == HitResult.Type.BLOCK) {
+                BlockPos hp = block.getBlockPos();
+                Vec3 onTop = new Vec3(hp.getX() + 0.5, hp.getY() + 1, hp.getZ() + 0.5);
+                if (block.getDirection() == Direction.UP && hasPlace(world, clipEnd)) {
+                    feet = clipEnd;
+                } else if (hasPlace(world, onTop)) {
+                    feet = onTop;
+                }
+            }
+            if (feet == null) {
+                double travel = clipEnd.distanceTo(eye);
+                if (block.getType() == HitResult.Type.BLOCK) {
+                    travel = Math.max(0, travel - 0.35);
+                }
+                feet = eye.add(dir.scale(travel)).subtract(0, player.getEyeHeight(), 0);
+            }
+
+            Vec3 pos = feet;
+            int steps = 0;
+            while (!hasPlace(world, pos)) {
+                if (++steps > 8) {
+                    return new Dest(feet, false);
+                }
+                pos = pos.add(dir.scale(-0.5));
+            }
+            return new Dest(pos, true);
+        }
+    }
+
+    @net.minecraftforge.api.distmarker.OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
+    @RegClientContext(MainContext.class)
+    public static class FlashingContextC extends ClientContext {
+
+        private final MainContext par;
+
+        private EntityTPMarking marking;
+        private GravityCancellor cancellor;
+        private ClientRuntime.IActivateHandler activateHandler;
+
+        private int performingKey = -1;
+
+        public FlashingContextC(MainContext par) {
+            super(par);
+            this.par = par;
+        }
+
+        @Listener(channel = MSG_MADEALIVE, side = LogicalSide.CLIENT)
+        private void l_madeAlive() {
+            if (!isLocal()) {
                 return;
             }
 
+            if (!ClientRuntime.available()) return;
+            ClientRuntime rt = ClientRuntime.instance();
+
+            activateHandler = new ClientRuntime.IActivateHandler() {
+                @Override
+                public boolean handles(Player p) {
+                    return par.getStatus() == Context.Status.ALIVE;
+                }
+
+                @Override
+                public void onKeyDown(Player p) {
+                    par.terminate();
+
+                    cn.academy.datapart.CPData.get(p).setActivateState(false,
+                            cn.academy.datapart.AbilityToggleSource.SKILL_KEY);
+                }
+
+                @Override
+                public String getHint() {
+                    return "deactivate";
+                }
+            };
+            rt.addActivateHandler(activateHandler);
+
+            net.minecraft.client.Options opts = net.minecraft.client.Minecraft.getInstance().options;
+            int[] keys = {
+                    -1,
+                    opts.keyLeft.getKey().getValue(),
+                    opts.keyRight.getKey().getValue(),
+                    opts.keyUp.getKey().getValue(),
+                    opts.keyDown.getKey().getValue()
+            };
+            for (int i = 1; i <= 4; i++) {
+                final int localid = i;
+                rt.addKey(KEY_GROUP, keys[localid], new KeyDelegate() {
+                    @Override
+                    public void onKeyDown() {
+                        localStart(localid);
+                    }
+
+                    @Override
+                    public void onKeyUp() {
+                        localEnd(localid);
+                    }
+
+                    @Override
+                    public void onKeyAbort() {
+                        localAbort(localid);
+                    }
+
+                    @Override
+                    public ResourceLocation getIcon() {
+                        return Resources.getTexture("abilities/teleporter/flashing/" + KEY_ICONS[localid]);
+                    }
+
+                    @Override
+                    public int createID() {
+                        return localid;
+                    }
+
+                    @Override
+                    public Skill getSkill() {
+                        return INSTANCE;
+                    }
+                });
+            }
+        }
+
+        private void localStart(int keyid) {
+            performingKey = keyid;
+            startEffects();
+        }
+
+        private void localEnd(int keyid) {
+            if (keyid != performingKey) {
+                return;
+            }
             endEffects();
-
-            sendToServer(MSG_PERFORM, performingKey);
-
+            if (par.getDest(keyid).available) {
+                par.sendToServer(MSG_PERFORM, keyid);
+            }
             performingKey = -1;
         }
 
-        @SideOnly(Side.CLIENT)
-        void localAbort(int localid) {
-            if (performingKey == localid) {
+        private void localAbort(int keyid) {
+            if (performingKey == keyid) {
                 performingKey = -1;
                 endEffects();
             }
         }
 
-        @SideOnly(Side.CLIENT)
-        @Listener(channel=MSG_TICK, side=Side.CLIENT)
-        void localTick() {
-            if (isLocal()) {
-                if (performingKey != -1 && !consume(true)) {
-                    performingKey = -1;
-                    endEffects();
-                } else {
-                    if (marking != null) {
-                        Vec3d dest = getDest(performingKey);
-                        marking.setPosition(dest.x, dest.y, dest.z);
-                    }
-                }
-
-                if (cancellor != null && cancellor.isDead())
-                    cancellor = null;
+        @Listener(channel = MSG_TICK, side = LogicalSide.CLIENT)
+        private void l_tick() {
+            if (!isLocal()) {
+                return;
+            }
+            if (performingKey != -1 && !ctx.canConsumeCP(par.consumption)) {
+                performingKey = -1;
+                endEffects();
+            } else if (marking != null) {
+                Dest dest = par.getDest(performingKey);
+                marking.available = dest.available;
+                marking.moveTo2(dest.pos.x, dest.pos.y + player.getEyeHeight(), dest.pos.z);
+                marking.yaw = player.getYRot();
+                marking.touch();
+            }
+            if (cancellor != null && cancellor.isDead()) {
+                cancellor = null;
             }
         }
 
-        @Listener(channel=MSG_TICK, side=Side.SERVER)
-        void serverTick() {
-            if(ctx.cpData.getOverload() < overloadKeep) ctx.cpData.setOverload(overloadKeep);
-            if(ticks > max_time) terminate();
-            ticks++;
-        }
-
-        @Listener(channel=MSG_PERFORM, side=Side.SERVER)
-        void serverPerform(int keyid) {
-            if (ctx.consume(0, consumption)) {
-                Vec3d dest = getDest(keyid);
-                if(player.isRiding())
-                    player.dismountRidingEntity();
-                player.setPositionAndUpdate(dest.x, dest.y, dest.z);
-                player.fallDistance = 0.0f;
-
-                ctx.addSkillExp(.002f);
-                TPSkillHelper.incrTPCount(player);
-
-                sendToClient(MSG_PERFORM);
-            }
-        }
-
-        @Listener(channel=MSG_PERFORM, side=Side.CLIENT)
-        @SideOnly(Side.CLIENT)
-        void clientPerform() {
-            ACSounds.playClient(player, "tp.tp_flashing", SoundCategory.AMBIENT, 1.0f);
+        @Listener(channel = MSG_PERFORM, side = LogicalSide.CLIENT)
+        private void c_perform() {
             if (isLocal()) {
+                net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                ACSounds.TP_MOVE_PLAYER.get(), 1.0f, 1.0f));
                 if (cancellor != null) {
                     cancellor.setDead();
-                    cancellor = null;
                 }
                 cancellor = new GravityCancellor(player, 40);
-                MinecraftForge.EVENT_BUS.register(cancellor);
             }
         }
 
-        @Listener(channel=MSG_TERMINATED, side=Side.CLIENT)
-        @SideOnly(Side.CLIENT)
-        void localTerminate() {
-            if (isLocal()) {
-                clientRuntime().removeActiveHandler(activateHandler);
-                clientRuntime().clearKeys(KEY_GROUP);
-                endEffects();
+        @Listener(channel = MSG_TERMINATED, side = LogicalSide.CLIENT)
+        private void c_terminated() {
+            if (!isLocal()) {
+                return;
+            }
+
+            if (!ClientRuntime.available()) return;
+            ClientRuntime rt = ClientRuntime.instance();
+            if (activateHandler != null) {
+                rt.removeActiveHandler(activateHandler);
+                activateHandler = null;
+            }
+            rt.clearKeys(KEY_GROUP);
+            endEffects();
+            if (cancellor != null) {
+                cancellor.setDead();
+                cancellor = null;
             }
         }
 
-        @Listener(channel=MSG_TERMINATED, side=Side.SERVER)
-        void serverTerminated() {
-            ctx.setCooldown(cooldown_time);
-        }
-
-        @SideOnly(Side.CLIENT)
         private void startEffects() {
             endEffects();
+            marking = new EntityTPMarking(player.level());
+            Dest dest = par.getDest(performingKey);
+            marking.available = dest.available;
+            marking.moveTo2(dest.pos.x, dest.pos.y + player.getEyeHeight(), dest.pos.z);
+            marking.yaw = player.getYRot();
 
-            marking = new EntityTPMarking(player);
-            Vec3d dest = getDest(performingKey);
-            marking.setPosition(dest.x, dest.y, dest.z);
-
-            world().spawnEntity(marking);
+            if (player instanceof net.minecraft.client.player.AbstractClientPlayer acp) {
+                marking.skin = acp.getSkinTextureLocation();
+                marking.slimArms = "slim".equals(acp.getModelName());
+            }
+            ACEffectEntities.spawn(marking);
         }
 
-        @SideOnly(Side.CLIENT)
         private void endEffects() {
             if (marking != null) {
-                marking.setDead();
+                marking.discard();
                 marking = null;
             }
         }
-
-        private boolean consume(boolean simulate) {
-            return simulate ? ctx.canConsumeCP(consumption) : ctx.consume(0, consumption);
-        }
-
-        private Vec3d getDest(int keyid) {
-            Preconditions.checkState(keyid != -1);
-
-            double dist = lerpf(12, 18, exp);
-
-            Vec3d dir = VecUtils.copy(dirs[keyid]);
-            dir = VecUtils.rotateAroundZ(dir, player.rotationPitch * MathUtils.PI_F / 180)
-                    .rotateYaw((-90 - player.rotationYaw) * MathUtils.PI_F / 180);
-
-
-            Vec3d dst = VecUtils.add(player.getPositionEyes(1F),VecUtils.multiply(dir, dist));
-            RayTraceResult mop = Raytrace.perform(player.getEntityWorld(), player.getPositionVector(),
-                    dst, EntitySelectors.living().and(EntitySelectors.exclude(player)));
-
-            double x, y, z;
-
-            if (mop.typeOfHit != RayTraceResult.Type.MISS) {
-                x = mop.hitVec.x;
-                y = mop.hitVec.y;
-                z = mop.hitVec.z;
-
-                if (mop.typeOfHit == RayTraceResult.Type.BLOCK) {
-                    switch (mop.sideHit) {
-                        case DOWN:
-                            y -= 1.0;
-                            break;
-                        case UP:
-                            y += 1.8;
-                            break;
-                        case NORTH:
-                            z -= .6;
-                            y = mop.hitVec.y + 1.7;
-                            break;
-                        case SOUTH:
-                            z += .6;
-                            y = mop.hitVec.y + 1.7;
-                            break;
-                        case WEST:
-                            x -= .6;
-                            y = mop.hitVec.y + 1.7;
-                            break;
-                        case EAST:
-                            x += .6;
-                            y = mop.hitVec.y + 1.7;
-                            break;
-                    }
-                    // check head
-                    if (mop.sideHit.getIndex() > 1) {
-                        int hx = (int) x, hy = (int) (y + 1), hz = (int) z;
-                        if (!player.getEntityWorld().isAirBlock(new BlockPos(hx, hy, hz))) {
-                            y -= 1.25;
-                        }
-                    }
-                } else {
-                    y += mop.entityHit.getEyeHeight();
-                }
-            } else {
-                x = dst.x;
-                y = dst.y;
-                z = dst.z;
-            }
-
-            return new Vec3d(x, y, z);
-        }
-
     }
-
 }

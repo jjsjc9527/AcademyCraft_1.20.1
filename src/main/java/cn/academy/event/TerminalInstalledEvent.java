@@ -1,18 +1,14 @@
 package cn.academy.event;
 
-import net.minecraftforge.fml.common.eventhandler.Event;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.eventbus.api.Event;
 
-/**
- * Fired both at client and server when player installed data terminal.
- * @author WeAthFolD
- */
 public class TerminalInstalledEvent extends Event {
-    
-    final EntityPlayer player;
-    
-    public TerminalInstalledEvent(EntityPlayer _player) {
+
+    public final Player player;
+
+    public TerminalInstalledEvent(Player _player) {
         player = _player;
     }
-    
+
 }

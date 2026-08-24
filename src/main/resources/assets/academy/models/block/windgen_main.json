@@ -1,1 +1,9 @@
-{"parent":"block/cube_all","textures":{"all":"academy:blocks/windgen_main"},"__xconfgen":true}
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/windgen_main.obj",
+  "flip_v": true,
+  "textures": {
+    "main": "academy:block/windgen_main",
+    "particle": "academy:item/windgen_main"
+  }
+}

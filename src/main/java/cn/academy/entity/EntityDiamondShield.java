@@ -1,62 +1,80 @@
 package cn.academy.entity;
 
-import cn.academy.client.render.entity.RenderDiamondShield;
-import cn.lambdalib2.registry.mc.RegEntity;
-import cn.lambdalib2.util.VecUtils;
-import cn.lambdalib2.util.entityx.EntityAdvanced;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.math.Vec3d;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import cn.academy.ACEntities;
+import cn.lambdalib2.util.GameTimer;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
-public class EntityDiamondShield extends EntityAdvanced
-{
+@OnlyIn(Dist.CLIENT)
+public class EntityDiamondShield extends Entity implements cn.academy.client.render.ACEffect {
 
-    public static final float SIZE = 1.8f;
-    
-    final EntityPlayer player;
+    public static final float RENDER_SCALE = 1.5f;
 
-    public EntityDiamondShield(EntityPlayer _player) {
-        super(_player.getEntityWorld());
-        player = _player;
-        this.setSize(SIZE, SIZE);
+    private LivingEntity owner;
 
-        setPosition(player.posX, player.posY, player.posZ);
-        ignoreFrustumCheck = true;
+    public final double spawnTime = GameTimer.getPausableTime();
+
+    public double lifespan = 15 / 20.0;
+
+    public double lastFeedTime = GameTimer.getPausableTime();
+
+    public void touch() {
+        lastFeedTime = GameTimer.getPausableTime();
+    }
+
+    public EntityDiamondShield(Level level) {
+        super(ACEntities.DIAMOND_SHIELD.get(), level);
+        noCulling = true;
+    }
+
+    public void init(LivingEntity owner) {
+        this.owner = owner;
+        updatePos();
+        xOld = getX();
+        yOld = getY();
+        zOld = getZ();
+    }
+
+    public LivingEntity getOwner() {
+        return owner;
+    }
+
+    public double age() {
+        return GameTimer.getPausableTime() - spawnTime;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
         updatePos();
     }
-    
-    @Override
-    public void onUpdate() {
-        super.onUpdate();
-        updatePos();
-    }
 
-    private void updatePos() {
-        Vec3d pos =
-            VecUtils.add(player.getPositionVector().add(0, 1.1, 0), VecUtils.multiply(player.getLookVec(), 1));
-
-        this.posX = pos.x;
-        this.posY = pos.y;
-        this.posZ = pos.z;
-        this.rotationYaw = player.rotationYawHead;
-        this.rotationPitch = player.rotationPitch;
-    }
-    
-    @Override
-    public boolean shouldRenderInPass(int pass) {
-        return pass == 1;
+    public void updatePos() {
+        if (owner == null) return;
+        Vec3 p = cn.academy.ability.vanilla.meltdowner.skill.LightShield.shieldCenter(owner);
+        setPos(p.x, p.y, p.z);
+        setYRot(owner.getYHeadRot());
+        setXRot(owner.getXRot());
     }
 
     @Override
-    protected void readEntityFromNBT(NBTTagCompound tag) {}
+    protected void defineSynchedData() {}
 
     @Override
-    protected void writeEntityToNBT(NBTTagCompound tag) {}
+    protected void readAdditionalSaveData(CompoundTag tag) {
+        discard();
+    }
 
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    public boolean effectExpired(double now) {
+        return now - lastFeedTime > 2.0;
+    }
 }

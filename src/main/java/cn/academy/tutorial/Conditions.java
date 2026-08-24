@@ -1,38 +1,32 @@
 package cn.academy.tutorial;
 
-import cn.lambdalib2.registry.StateEventCallback;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import net.minecraftforge.fml.common.FMLCommonHandler;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent.ItemCraftedEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent.ItemPickupEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent.ItemSmeltedEvent;
-import net.minecraft.block.Block;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Factory of various kinds of conditions. Condition can be only created from this class.
- */
 public class Conditions {
 
     private Conditions() {}
 
+    private static final Condition ALWAYS_TRUE = player -> true;
+
     private static final List<Condition> indexedConditions = new ArrayList<>();
     private static final Multimap<Item, ItemInfo>
-        craftConds = ArrayListMultimap.create(),
-        smeltConds = ArrayListMultimap.create(),
-        pickupConds = ArrayListMultimap.create();
+            craftConds = ArrayListMultimap.create(),
+            smeltConds = ArrayListMultimap.create(),
+            pickupConds = ArrayListMultimap.create();
 
     public static Condition alwaysTrue() {
-        return player -> true;
+        return ALWAYS_TRUE;
     }
 
     public static Condition itemCrafted(Item item) {
@@ -68,11 +62,11 @@ public class Conditions {
     }
 
     public static Condition itemObtained(Block block) {
-        return itemObtained(Item.getItemFromBlock(block));
+        return itemObtained(block.asItem());
     }
 
     public static Condition itemObtained(Block block, int meta) {
-        return itemObtained(Item.getItemFromBlock(block), meta);
+        return itemObtained(block.asItem(), meta);
     }
 
     private static IndexedCondition indexed() {
@@ -85,12 +79,10 @@ public class Conditions {
     private static Condition createItemMapped(Multimap<Item, ItemInfo> map, Item item, int meta) {
         IndexedCondition ret = indexed();
         map.put(item, new ItemInfo(ret, item, meta));
-
         return ret;
     }
 
     private static class IndexedCondition implements Condition {
-
         final int index;
 
         IndexedCondition(int idx) {
@@ -98,13 +90,12 @@ public class Conditions {
         }
 
         @Override
-        public boolean test(EntityPlayer entityPlayer) {
-            return TutorialData.get(entityPlayer).isCondActivate(index);
+        public boolean test(Player player) {
+            return TutorialData.get(player).isCondActivate(index);
         }
     }
 
     private static class ItemInfo {
-
         public final IndexedCondition cond;
         public final Item item;
         public final int meta;
@@ -118,40 +109,34 @@ public class Conditions {
         public boolean metaSensitive() {
             return meta != -1;
         }
-
     }
 
-    @StateEventCallback
-    private static void _init(FMLInitializationEvent ev) {
-        Conditions instance = new Conditions();
-        MinecraftForge.EVENT_BUS.register(instance);
-        FMLCommonHandler.instance().bus().register(instance);
+    public static void init() {
+        MinecraftForge.EVENT_BUS.register(new Conditions());
     }
 
     @SubscribeEvent
-    public void onItemSmelt(ItemSmeltedEvent evt) {
-        trigger(smeltConds, evt.smelting, evt.player);
+    public void onItemSmelt(PlayerEvent.ItemSmeltedEvent evt) {
+        trigger(smeltConds, evt.getSmelting(), evt.getEntity());
     }
 
     @SubscribeEvent
-    public void onItemCraft(ItemCraftedEvent evt) {
-        trigger(craftConds, evt.crafting, evt.player);
+    public void onItemCraft(PlayerEvent.ItemCraftedEvent evt) {
+        trigger(craftConds, evt.getCrafting(), evt.getEntity());
     }
 
     @SubscribeEvent
-    public void onItemPickup(ItemPickupEvent evt) {
-        trigger(pickupConds, evt.pickedUp.getItem(), evt.player);
+    public void onItemPickup(PlayerEvent.ItemPickupEvent evt) {
+        trigger(pickupConds, evt.getStack(), evt.getEntity());
     }
 
-    private void trigger(Multimap<Item, ItemInfo> map, ItemStack stack, EntityPlayer player) {
-        if (!player.world.isRemote) {
+    private void trigger(Multimap<Item, ItemInfo> map, ItemStack stack, Player player) {
+        if (!player.level().isClientSide) {
             TutorialData tdata = TutorialData.get(player);
             map.get(stack.getItem())
                     .stream()
-                    .filter(info -> !info.metaSensitive() || stack.getItemDamage() == info.meta)
-                    .forEach(info -> {
-                        tdata.setCondActivate(info.cond.index);
-                    });
+                    .filter(info -> !info.metaSensitive() || stack.getDamageValue() == info.meta)
+                    .forEach(info -> tdata.setCondActivate(info.cond.index));
         }
     }
 

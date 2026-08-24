@@ -1,10 +1,10 @@
 package cn.academy.terminal.app.settings;
 
-import net.minecraft.client.resources.I18n;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-@SideOnly(Side.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class UIProperty {
 
     public static class Config extends UIProperty {
@@ -31,17 +31,18 @@ public class UIProperty {
 
     public final IPropertyElement element;
     public final String id;
+
     public final boolean singlePlayer;
-    
+
     public UIProperty(IPropertyElement _element, String _id, boolean _singlePlayer) {
         element = _element;
         id = _id;
         singlePlayer = _singlePlayer;
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public String getDisplayID() {
-        return I18n.format("ac.settings.prop." + id);
+        return I18n.get("settings.academy.prop." + id);
     }
-    
+
 }

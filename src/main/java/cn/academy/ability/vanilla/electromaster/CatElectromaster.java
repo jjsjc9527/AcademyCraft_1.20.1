@@ -1,211 +1,81 @@
 package cn.academy.ability.vanilla.electromaster;
 
 import cn.academy.ability.Category;
-import cn.academy.ability.Skill;
-import cn.academy.AcademyCraft;
-import cn.academy.ability.vanilla.VanillaCategories;
-import cn.academy.ability.vanilla.electromaster.skill.*;
-import cn.lambdalib2.registry.StateEventCallback;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockOre;
-import net.minecraft.block.BlockRedstoneOre;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityList;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.oredict.OreDictionary;
+import cn.academy.ability.CategoryManager;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 
-import java.util.HashSet;
+import java.util.Set;
 
-/**
- * @author WeAthFolD
- *
- */
-public class CatElectromaster extends Category {
+public final class CatElectromaster {
 
-    public static final Skill
-        arcGen = ArcGen.instance,
-        magManip = MagManip.INSTANCE,
-        mineDetect = MineDetect$.MODULE$,
-        railgun = Railgun$.MODULE$,
-        magMovement = MagMovement$.MODULE$,
-        currentCharging = CurrentCharging$.MODULE$,
-        bodyIntensify = BodyIntensify$.MODULE$,
-        thunderBolt = ThunderBolt$.MODULE$,
-        thunderClap = ThunderClap$.MODULE$
-        /* ironSand = ??? */;
+    public static final Category CATEGORY = new Category("electromaster");
 
-    public CatElectromaster() {
-        super("electromaster");
+    private CatElectromaster() {}
 
-        setColorStyle(20, 113, 208, 100);
+    private static final Set<Block> NORMAL_METAL = Set.of(
+            Blocks.RAIL, Blocks.ACTIVATOR_RAIL, Blocks.DETECTOR_RAIL, Blocks.POWERED_RAIL,
+            Blocks.IRON_BARS, Blocks.IRON_BLOCK, Blocks.STICKY_PISTON, Blocks.PISTON);
 
-        arcGen.setPosition(24, 46);
-        currentCharging.setPosition(55, 18);
-        bodyIntensify.setPosition(97, 15);
-        mineDetect.setPosition(225, 12);
-        magMovement.setPosition(137, 35);
-        thunderBolt.setPosition(86, 67);
-        railgun.setPosition(164, 59);
-        thunderClap.setPosition(204, 80);
-        magManip.setPosition(204, 33);
+    private static final Set<Block> WEAK_METAL = Set.of(
+            Blocks.DISPENSER, Blocks.HOPPER, Blocks.IRON_ORE, Blocks.DEEPSLATE_IRON_ORE);
 
-        addSkill(arcGen);
-        addSkill(currentCharging);
-        addSkill(magMovement);
-        addSkill(magManip);
-        addSkill(mineDetect);
+    private static final Set<EntityType<?>> METAL_ENTITIES = Set.of(
+            EntityType.MINECART, EntityType.CHEST_MINECART, EntityType.FURNACE_MINECART,
+            EntityType.TNT_MINECART, EntityType.HOPPER_MINECART, EntityType.SPAWNER_MINECART,
+            EntityType.COMMAND_BLOCK_MINECART, EntityType.IRON_GOLEM);
 
-        // TODO Finish the skill
-        // addSkill(ironSand = new IronSand());
+    public static boolean isNormalMetalBlock(Block block) { return NORMAL_METAL.contains(block); }
+    public static boolean isWeakMetalBlock(Block block) { return WEAK_METAL.contains(block); }
+    public static boolean isMetalBlock(Block block) { return isNormalMetalBlock(block) || isWeakMetalBlock(block); }
+    public static boolean isEntityMetallic(Entity e) { return METAL_ENTITIES.contains(e.getType()); }
 
-        addSkill(bodyIntensify);
-        addSkill(thunderBolt);
-        addSkill(railgun);
-        addSkill(thunderClap);
+    public static void register() {
 
-        VanillaCategories.addGenericSkills(this);
+        CATEGORY.setColorStyle(20, 113, 208, 100);
 
-        // Assign deps
-        currentCharging.setParent(arcGen, 0.3f);
+        ElectricArc.INSTANCE.setPosition(24, 46);
+        MagMovement.INSTANCE.setPosition(137, 35);
+        BodyIntensify.INSTANCE.setPosition(97, 15);
+        ThunderBolt.INSTANCE.setPosition(39, 72);
+        Railgun.INSTANCE.setPosition(116, 65);
+        ThunderClap.INSTANCE.setPosition(170, 73);
 
-        magMovement.setParent(arcGen);
-        magMovement.addSkillDep(currentCharging, 0.7f);
+        CATEGORY.addSkill(ElectricArc.INSTANCE);
+        CATEGORY.addSkill(MagMovement.INSTANCE);
+        CATEGORY.addSkill(BodyIntensify.INSTANCE);
+        CATEGORY.addSkill(ThunderBolt.INSTANCE);
+        CATEGORY.addSkill(Railgun.INSTANCE);
+        CATEGORY.addSkill(ThunderClap.INSTANCE);
 
-        magManip.setParent(magMovement, 0.5f);
+        MagMovement.INSTANCE.setParent(ElectricArc.INSTANCE);
+        BodyIntensify.INSTANCE.setParent(ElectricArc.INSTANCE, 1f);
+        ThunderBolt.INSTANCE.setParent(ElectricArc.INSTANCE);
 
-        bodyIntensify.setParent(arcGen, 1f);
-        bodyIntensify.addSkillDep(currentCharging, 1f);
+        Railgun.INSTANCE.setParent(ElectricArc.INSTANCE, 0.3f);
+        ThunderClap.INSTANCE.setParent(Railgun.INSTANCE, 0.3f);
 
-        mineDetect.setParent(magManip, 1f);
+        cn.academy.ability.vanilla.VanillaCategories.addGenericSkills(CATEGORY);
 
-        thunderBolt.setParent(arcGen);
-        thunderBolt.addSkillDep(currentCharging, 0.7f);
+        MagFieldControl.INSTANCE.setPosition(204, 33);
+        CATEGORY.addSkill(MagFieldControl.INSTANCE);
 
-        railgun.setParent(thunderBolt, 0.3f);
-        railgun.addSkillDep(magManip, 1f);
+        MagFieldControl.INSTANCE.setParent(MagMovement.INSTANCE, 0.5f);
 
-        // ironSand.setParent(magManip, 1f);
+        CurrentCharging.INSTANCE.setPosition(20, 8);
+        CATEGORY.addSkill(CurrentCharging.INSTANCE);
+        CurrentCharging.INSTANCE.setParent(ElectricArc.INSTANCE, 0.3f);
 
-        thunderClap.setParent(thunderBolt, 1f);
+        IronSandControl.INSTANCE.setPosition(86, 100);
+
+        CATEGORY.addSkill(IronSandControl.INSTANCE);
+        IronSandControl.INSTANCE.setParent(ThunderBolt.INSTANCE, 0.8f);
+        IronSandControl.init();
+
+        CategoryManager.INSTANCE.register(CATEGORY);
+
+        cn.academy.ability.vanilla.VanillaCategories.addLateGenericSkills(CATEGORY);
     }
-
-    public static boolean isOreBlock(Block block) {
-        if (block instanceof BlockOre || block instanceof BlockRedstoneOre) {
-            return true;
-        }
-
-        if (Item.getItemFromBlock(block) == Items.AIR)
-            return false;
-        ItemStack stack = new ItemStack(block);
-        int[] val = OreDictionary.getOreIDs(stack);
-        for (int i : val) {
-            if (OreDictionary.getOreName(i).contains("ore"))
-                return true;
-        }
-        return false;
-    }
-
-    private static HashSet<Block> normalMetalBlocks = new HashSet<>();
-    private static HashSet<Block> weakMetalBlocks = new HashSet<>();
-
-    private static HashSet<Class<? extends Entity>> metalEntities = new HashSet<>();
-
-    @StateEventCallback
-    public static void init(FMLInitializationEvent event) {
-
-        String[] defaultNBlocks = {
-            "rail",
-            "iron_bars",
-            "iron_block",
-            "activator_rail",
-            "detector_rail",
-            "golden_rail",
-            "sticky_piston",
-            "piston"
-        };
-        String[] cfgNBlocks = AcademyCraft.config.getStringList("normalMetalBlocks", "ability", defaultNBlocks,
-                "Supported Normal Metal Blocks of Electro Master. The block name and ore dictionary name can be used.");
-        for (String block : cfgNBlocks) {
-            if(Block.getBlockFromName(block) != null) {
-                normalMetalBlocks.add(Block.getBlockFromName(block));
-            } else if(OreDictionary.doesOreNameExist(block)) {
-                for(ItemStack is : OreDictionary.getOres(block)) {
-                    normalMetalBlocks.add(Block.getBlockFromItem(is.getItem()));
-                }
-            } else {
-                AcademyCraft.log.error("The block " + block + "is not found!");
-            }
-        }
-
-        String[] defaultWBlocks = {
-            "dispenser",
-            "hopper",
-            "iron_ore"
-        };
-        String[] cfgWBlocks = AcademyCraft.config.getStringList("weakMetalBlocks", "ability", defaultWBlocks,
-             "Supported Weak Metal Blocks of Electro Master. The block name and ore dictionary name can be used.");
-        for (String block : cfgWBlocks) {
-            if(Block.getBlockFromName(block) != null) {
-                weakMetalBlocks.add(Block.getBlockFromName(block));
-            } else if(OreDictionary.doesOreNameExist(block)) {
-                for(ItemStack is : OreDictionary.getOres(block)) {
-                    weakMetalBlocks.add(Block.getBlockFromItem(is.getItem()));
-                }
-            } else {
-                AcademyCraft.log.error("The block " + block + "is not found!");
-            }
-        }
-
-        String[] defaultEntities = {
-            "minecart",
-            "chest_minecart",
-            "furnace_minecart",
-            "tnt_minecart",
-            "hopper_minecart",
-            "spawner_minecart",
-            "commandblock_minecart",
-            "academy:EntityMagHook",
-            "villager_golem"
-        };
-        String[] cfgEntities = AcademyCraft.config.getStringList(
-            "metalEntities",
-            "ability",
-            defaultEntities,
-            "Supported Metal Entities of Electro Master. The entity name can be used."
-        );
-        for (String entityName : cfgEntities) {
-            Class<? extends Entity> c = EntityList.getClass(new ResourceLocation(entityName));
-            if (c == null)
-                throw new RuntimeException("Invalid entity name: " + entityName + " at academy.cfg.");
-
-            metalEntities.add(c);
-        }
-
-    }
-
-    public static boolean isMetalBlock(Block block) {
-        return isNormalMetalBlock(block) || isWeakMetalBlock(block);
-    }
-
-    public static boolean isNormalMetalBlock(Block block) {
-        return normalMetalBlocks.contains(block);
-    }
-
-    public static boolean isWeakMetalBlock(Block block) {
-        return weakMetalBlocks.contains(block);
-    }
-
-    public static boolean isEntityMetallic(Entity ent) {
-        if(metalEntities.isEmpty()) return false;
-        for (Class<? extends Entity> cl : metalEntities) {
-            if (cl.isInstance(ent))
-                return true;
-        }
-        return false;
-    }
-
 }

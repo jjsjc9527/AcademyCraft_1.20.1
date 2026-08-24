@@ -1,83 +1,57 @@
 package cn.academy.tutorial;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.world.entity.player.Player;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-/**
- * This class handles tutorials' general registry.
- */
 public class TutorialRegistry {
 
-    private static HashMap<String,ACTutorial> tutorials=new LinkedHashMap<>();
+    private static final Map<String, ACTutorial> tutorials = new LinkedHashMap<>();
 
-    public static void addTutorials(ACTutorial...tutorial) {
-        for(ACTutorial t : tutorial){
-            if(tutorials.containsKey(t.id))
+    public static void addTutorials(ACTutorial... tutorial) {
+        for (ACTutorial t : tutorial) {
+            if (tutorials.containsKey(t.id))
                 throw new RuntimeException("Already have a tutorial with this id:" + t.id);
             tutorials.put(t.id, t);
         }
     }
 
     public static ACTutorial addTutorial(String string) {
-        ACTutorial t=new ACTutorial(string);
+        ACTutorial t = new ACTutorial(string);
         addTutorials(t);
         return t;
     }
 
-    public static void addTutorials(String...string) {
-        ACTutorial[] acTu=new ACTutorial[string.length];
-        int i = 0;
-        for(String s : string){
-            acTu[i] = new ACTutorial(s);
-            i++;
-        }
-        addTutorials(acTu);
-    }
-
     public static ACTutorial getTutorial(String s) {
-        ACTutorial t;
-        if(!tutorials.containsKey(s))
-            throw new RuntimeException("No such a tutorial;");
-        t=tutorials.get(s);
-        return t;
+        if (!tutorials.containsKey(s))
+            throw new RuntimeException("No such a tutorial: " + s);
+        return tutorials.get(s);
     }
 
-    /**
-     * Get a collection of tutorial learned by the player.
-     */
-    public static Collection<ACTutorial> getLearned(EntityPlayer player) {
-        return tutorials
-                .values()
-                .stream()
-                .filter(t -> t.isActivated(player))
-                .collect(Collectors.toList());
+    public static Collection<ACTutorial> getLearned(Player player) {
+        List<ACTutorial> ret = new ArrayList<>();
+        for (ACTutorial t : tutorials.values()) {
+            if (t.isActivated(player)) ret.add(t);
+        }
+        return ret;
     }
 
-    /**
-     * Get two list of tutorials, one is the set of learned, another the set of unlearned.
-     */
-    public static Pair<List<ACTutorial>, List<ACTutorial>> groupByLearned(EntityPlayer player) {
+    public static Pair<List<ACTutorial>, List<ACTutorial>> groupByLearned(Player player) {
         List<ACTutorial> learned = new ArrayList<>();
         List<ACTutorial> unlearned = new ArrayList<>();
-
         for (ACTutorial tut : tutorials.values()) {
-            if (tut.isActivated(player)) {
-                learned.add(tut);
-            } else {
-                unlearned.add(tut);
-            }
+            if (tut.isActivated(player)) learned.add(tut);
+            else unlearned.add(tut);
         }
-
         return Pair.of(learned, unlearned);
     }
 
-    /**
-     * Get a immutable enumeration of all registered tutorial.
-     */
     public static Collection<ACTutorial> enumeration() {
         return ImmutableList.copyOf(tutorials.values());
     }

@@ -1,0 +1,10 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/dev_advanced_ghost1.obj",
+  "flip_v": true,
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "developer_advanced": "academy:block/transparent",
+    "particle": "academy:item/dev_advanced"
+  }
+}

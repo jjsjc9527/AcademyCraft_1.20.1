@@ -1,53 +1,448 @@
 {
-  "ability.deny": {"category": "master", "sounds": [{"name": "academy:ability/deny", "stream": false}]},
-
-  "em.arc_weak": {"category": "master", "sounds": [{"name": "academy:em/arc_weak", "stream": false}]},
-  "em.arc_strong": {"category": "master", "sounds": [{"name": "academy:em/arc_strong", "stream": false}]},
-  "em.minedetect": {"category": "master", "sounds": [{"name": "academy:em/minedetect", "stream": false}]},
-  "em.railgun": {"category": "master", "sounds": [{"name": "academy:em/railgun", "stream": false}]},
-  "em.move_loop": {"category": "master", "sounds": [{"name": "academy:em/move_loop", "stream": false}]},
-  "em.charge_loop": {"category": "master", "sounds": [{"name": "academy:em/charge_loop", "stream": false}]},
-  "em.intensify_activate": {"category": "master", "sounds": [{"name": "academy:em/intensify_activate", "stream": false}]},
-  "em.intensify_loop": {"category": "master", "sounds": [{"name": "academy:em/intensify_loop", "stream": false}]},
-  "em.lf_loop": {"category": "master", "sounds": [{"name": "academy:em/lf_loop", "stream": false}]},
-  "em.mag_manip": {"category": "master", "sounds": [{"name": "academy:em/mag_manip", "stream": false}]},
-
-  "md.ballshoot": {"category": "master", "sounds": [{"name": "academy:md/ballshoot", "stream": false}]},
-  "md.ray_small": {"category": "master", "sounds": [{"name": "academy:md/ray_small", "stream": false}]},
-  "md.shield_startup": {"category": "master", "sounds": [{"name": "academy:md/shield_startup", "stream": false}]},
-  "md.shield_loop": {"category": "master", "sounds": [{"name": "academy:md/shield_loop", "stream": false}]},
-  "md.meltdowner": {"category": "master", "sounds": [{"name": "academy:md/meltdowner", "stream": false}]},
-  "md.mine_loop": {"category": "master", "sounds": [{"name": "academy:md/mine_loop", "stream": false}]},
-  "md.mine_basic_startup": {"category": "master", "sounds": [{"name": "academy:md/mine_basic_startup", "stream": false}]},
-  "md.mine_luck_startup": {"category": "master", "sounds": [{"name": "academy:md/mine_luck_startup", "stream": false}]},
-  "md.mine_expert_startup": {"category": "master", "sounds": [{"name": "academy:md/mine_expert_startup", "stream": false}]},
-  "md.simple_charge": {"category": "master", "sounds": [{"name": "academy:md/simple_charge", "stream": false}]},
-  "md.md_charge": {"category": "master", "sounds": [{"name": "academy:md/md_charge", "stream": false}]},
-
-  "entity.flipcoin": {"category": "master", "sounds": [{"name": "academy:entity/flipcoin", "stream": false}]},
-  "entity.silbarn_heavy": {"category": "master", "sounds": [{"name": "academy:entity/silbarn_heavy", "stream": false}]},
-  "entity.silbarn_light": {"category": "master", "sounds": [{"name": "academy:entity/silbarn_light", "stream": false}]},
-
-  "terminal.select": {"category": "master", "sounds": [{"name": "academy:terminal/select", "stream": false}]},
-  "terminal.confirm": {"category": "master", "sounds": [{"name": "academy:terminal/confirm", "stream": false}]},
-
-  "tp.tp": {"category": "master", "sounds": [{"name": "academy:tp/tp", "stream": false}]},
-  "tp.tp_pre": {"category": "master", "sounds": [{"name": "academy:tp/tp_pre", "stream": false}]},
-  "tp.guts": {"category": "master", "sounds": [{"name": "academy:tp/guts", "stream": false}]},
-  "tp.tp_shift": {"category": "master", "sounds": [{"name": "academy:tp/tp_shift", "stream": false}]},
-  "tp.tp_flashing": {"category": "master", "sounds": [{"name": "academy:tp/tp_flashing", "stream": false}]},
-
-  "vecmanip.blood_retro": {"category": "master", "sounds": [{"name": "academy:vecmanip/blood_retro", "stream": false}]},
-  "vecmanip.directed_shock": {"category": "master", "sounds": [{"name": "academy:vecmanip/directed_shock", "stream": false}]},
-  "vecmanip.groundshock": {"category": "master", "sounds": [{"name": "academy:vecmanip/groundshock", "stream": false}]},
-  "vecmanip.directed_blast": {"category": "master", "sounds": [{"name": "academy:vecmanip/directed_blast", "stream": false}]},
-  "vecmanip.vec_accel": {"category": "master", "sounds": [{"name": "academy:vecmanip/vec_accel", "stream": false}]},
-  "vecmanip.plasma_cannon": {"category": "master", "sounds": [{"name": "academy:vecmanip/plasma_cannon", "stream": false}]},
-  "vecmanip.storm_wing": {"category": "master", "sounds": [{"name": "academy:vecmanip/storm_wing", "stream": false}]},
-  "vecmanip.vec_deviation": {"category": "master", "sounds": [{"name": "academy:vecmanip/vec_deviation", "stream": false}]},
-  "vecmanip.vec_reflection": {"category": "master", "sounds": [{"name": "academy:vecmanip/vec_reflection", "stream": false}]},
-  "vecmanip.plasma_cannon_t": {"category": "master", "sounds": [{"name": "academy:vecmanip/plasma_cannon_t", "stream": false}]},
-
-  "machine.imag_fusor_work": {"category": "master", "sounds": [{"name": "academy:machine/imag_fusor_work", "stream": true}]},
-  "machine.machine_work": {"category": "master", "sounds": [{"name": "academy:machine/machine_work", "stream": true}]}
+  "machine.machine_work": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:machine/machine_work",
+        "stream": true
+      }
+    ]
+  },
+  "machine.imag_fusor_work": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:machine/imag_fusor_work",
+        "stream": true
+      }
+    ]
+  },
+  "terminal.select": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:terminal/select",
+        "stream": false
+      }
+    ]
+  },
+  "em.arc_weak": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/arc_weak",
+        "stream": false
+      }
+    ]
+  },
+  "em.arc_strong": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/arc_strong",
+        "stream": false
+      }
+    ]
+  },
+  "em.charge_loop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/charge_loop",
+        "stream": false
+      }
+    ]
+  },
+  "em.intensify_loop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/intensify_loop",
+        "stream": false
+      }
+    ]
+  },
+  "em.intensify_activate": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/intensify_activate",
+        "stream": false
+      }
+    ]
+  },
+  "em.ironsand_attack": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/ironsand_attack",
+        "stream": false
+      }
+    ]
+  },
+  "em.ironsand_cycle": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/ironsand_cycle",
+        "stream": false
+      }
+    ]
+  },
+  "em.move_loop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/move_loop",
+        "stream": false
+      }
+    ]
+  },
+  "em.railgun": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/railgun",
+        "stream": false
+      }
+    ]
+  },
+  "em.thunder_clap": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:em/thunder_clap",
+        "stream": false
+      }
+    ]
+  },
+  "entity.flipcoin": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:entity/flipcoin",
+        "stream": false
+      }
+    ]
+  },
+  "tp.tp": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/tp",
+        "stream": false
+      }
+    ]
+  },
+  "tp.move_player": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/move_player",
+        "stream": false
+      }
+    ]
+  },
+  "tp.tp_shift": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/tp_shift",
+        "stream": false
+      }
+    ]
+  },
+  "tp.tp_flashing": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/tp_flashing",
+        "stream": false
+      }
+    ]
+  },
+  "tp.move_block": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/move_block",
+        "stream": false
+      }
+    ]
+  },
+  "tp.move_block_speed": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:tp/move_block_speed",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.directed_shock": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/directed_shock",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.groundshock": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/groundshock",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.directed_blast": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/directed_blast",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.vec_accel": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vec_accel",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.vec_deviation": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vec_deviation",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.vec_reflection": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vac_reflex2",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.storm_wing": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/storm_wing",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.wing_flap": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vec_wing_1",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_2",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_3",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_4",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_5",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_6",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_7",
+        "stream": false
+      },
+      {
+        "name": "academy:vecmanip/vec_wing_8",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.crush_loop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vec_spece",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.vec_explosion": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/vec_explosion",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.plasma_cannon": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/plasma_cannon",
+        "stream": false
+      }
+    ]
+  },
+  "vecmanip.plasma_cannon_t": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:vecmanip/plasma_cannon_t",
+        "stream": false
+      }
+    ]
+  },
+  "md.ray_small": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/ray_small",
+        "stream": false
+      }
+    ]
+  },
+  "md.mel_laser": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/mel_laser",
+        "stream": false
+      }
+    ]
+  },
+  "md.shield_startup": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/shield_startup",
+        "stream": false
+      }
+    ]
+  },
+  "md.shield_loop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/shield_loop",
+        "stream": false
+      }
+    ]
+  },
+  "md.meltdowner": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/meltdowner",
+        "stream": false
+      }
+    ]
+  },
+  "md.md_charge": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:md/md_charge",
+        "stream": false
+      }
+    ]
+  },
+  "entity.silbarn_heavy": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:entity/silbarn_heavy",
+        "stream": false
+      }
+    ]
+  },
+  "entity.silbarn_light": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:entity/silbarn_light",
+        "stream": false
+      }
+    ]
+  },
+  "mo.controlsound": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "academy:mo/controlsound",
+        "stream": false
+      }
+    ]
+  },
+  "vanilla.egg_throw": {
+    "sounds": [
+      "minecraft:random/bow"
+    ],
+    "subtitle": "subtitles.entity.egg.throw"
+  },
+  "vanilla.bell_resonate": {
+    "sounds": [
+      "minecraft:block/bell/resonate",
+      {
+        "name": "minecraft:block/bell/resonate",
+        "pitch": 0.85
+      },
+      {
+        "name": "minecraft:block/bell/resonate",
+        "pitch": 0.9
+      }
+    ],
+    "subtitle": "subtitles.block.bell.resonate"
+  },
+  "vanilla.player_breath": {
+    "sounds": [
+      "minecraft:random/breath"
+    ]
+  },
+  "vanilla.amethyst_chime": {
+    "sounds": [
+      {
+        "name": "minecraft:block/amethyst/shimmer",
+        "volume": 0.2
+      }
+    ],
+    "subtitle": "subtitles.block.amethyst_block.chime"
+  },
+  "vanilla.item_break": {
+    "sounds": [
+      "minecraft:random/break"
+    ],
+    "subtitle": "subtitles.entity.item.break"
+  },
+  "vanilla.generic_explode": {
+    "sounds": [
+      "minecraft:random/explode1",
+      "minecraft:random/explode2",
+      "minecraft:random/explode3",
+      "minecraft:random/explode4"
+    ],
+    "subtitle": "subtitles.entity.generic.explode"
+  }
 }

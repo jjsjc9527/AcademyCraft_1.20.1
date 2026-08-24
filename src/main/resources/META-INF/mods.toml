@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+
+license="GPL-3.0-or-later"
+issueTrackerURL="https://github.com/lom2333/AcademyCraft-Return/issues"
+
+[[mixins]]
+config="academy.mixins.json"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description='''
+A Minecraft mod about superability. 1.20.1 Forge 移植版(基于 GPLv3 二次开发)。
+
+原作者:LambdaInnovation (https://github.com/LambdaInnovation/AcademyCraft)
+本项目为 GPLv3 下的 1.20.1 移植/二次开发版本,完全免费,禁止任何形式收费。
+'''
+
+[[dependencies.${mod_id}]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"

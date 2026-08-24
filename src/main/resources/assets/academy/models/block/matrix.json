@@ -1,1 +1,9 @@
-{"parent":"block/cube_all","textures":{"all":"academy:blocks/matrix"},"__xconfgen":true}
+{
+    "loader": "forge:obj",
+    "model": "academy:models/block/matrix.obj",
+    "flip_v": true,
+    "textures": {
+        "matrix": "academy:block/matrix",
+        "particle": "academy:block/matrix"
+    }
+}

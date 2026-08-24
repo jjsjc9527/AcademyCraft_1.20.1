@@ -1,1 +1,124 @@
-{"variants":{"normal":{"model":"academy:dev_normal"}},"__xconfgen":true}
+{
+  "variants": {
+    "facing=north,sub=0": {
+      "model": "academy:block/dev_normal_ghost0"
+    },
+    "facing=east,sub=0": {
+      "model": "academy:block/dev_normal_ghost0",
+      "y": 90
+    },
+    "facing=south,sub=0": {
+      "model": "academy:block/dev_normal_ghost0",
+      "y": 180
+    },
+    "facing=west,sub=0": {
+      "model": "academy:block/dev_normal_ghost0",
+      "y": 270
+    },
+    "facing=north,sub=1": {
+      "model": "academy:block/dev_normal_ghost1"
+    },
+    "facing=east,sub=1": {
+      "model": "academy:block/dev_normal_ghost1",
+      "y": 90
+    },
+    "facing=south,sub=1": {
+      "model": "academy:block/dev_normal_ghost1",
+      "y": 180
+    },
+    "facing=west,sub=1": {
+      "model": "academy:block/dev_normal_ghost1",
+      "y": 270
+    },
+    "facing=north,sub=2": {
+      "model": "academy:block/dev_normal_ghost2"
+    },
+    "facing=east,sub=2": {
+      "model": "academy:block/dev_normal_ghost2",
+      "y": 90
+    },
+    "facing=south,sub=2": {
+      "model": "academy:block/dev_normal_ghost2",
+      "y": 180
+    },
+    "facing=west,sub=2": {
+      "model": "academy:block/dev_normal_ghost2",
+      "y": 270
+    },
+    "facing=north,sub=3": {
+      "model": "academy:block/dev_normal_ghost3"
+    },
+    "facing=east,sub=3": {
+      "model": "academy:block/dev_normal_ghost3",
+      "y": 90
+    },
+    "facing=south,sub=3": {
+      "model": "academy:block/dev_normal_ghost3",
+      "y": 180
+    },
+    "facing=west,sub=3": {
+      "model": "academy:block/dev_normal_ghost3",
+      "y": 270
+    },
+    "facing=north,sub=4": {
+      "model": "academy:block/dev_normal_ghost4"
+    },
+    "facing=east,sub=4": {
+      "model": "academy:block/dev_normal_ghost4",
+      "y": 90
+    },
+    "facing=south,sub=4": {
+      "model": "academy:block/dev_normal_ghost4",
+      "y": 180
+    },
+    "facing=west,sub=4": {
+      "model": "academy:block/dev_normal_ghost4",
+      "y": 270
+    },
+    "facing=north,sub=5": {
+      "model": "academy:block/dev_normal_ghost5"
+    },
+    "facing=east,sub=5": {
+      "model": "academy:block/dev_normal_ghost5",
+      "y": 90
+    },
+    "facing=south,sub=5": {
+      "model": "academy:block/dev_normal_ghost5",
+      "y": 180
+    },
+    "facing=west,sub=5": {
+      "model": "academy:block/dev_normal_ghost5",
+      "y": 270
+    },
+    "facing=north,sub=6": {
+      "model": "academy:block/dev_normal_ghost6"
+    },
+    "facing=east,sub=6": {
+      "model": "academy:block/dev_normal_ghost6",
+      "y": 90
+    },
+    "facing=south,sub=6": {
+      "model": "academy:block/dev_normal_ghost6",
+      "y": 180
+    },
+    "facing=west,sub=6": {
+      "model": "academy:block/dev_normal_ghost6",
+      "y": 270
+    },
+    "facing=north,sub=7": {
+      "model": "academy:block/dev_normal_ghost7"
+    },
+    "facing=east,sub=7": {
+      "model": "academy:block/dev_normal_ghost7",
+      "y": 90
+    },
+    "facing=south,sub=7": {
+      "model": "academy:block/dev_normal_ghost7",
+      "y": 180
+    },
+    "facing=west,sub=7": {
+      "model": "academy:block/dev_normal_ghost7",
+      "y": 270
+    }
+  }
+}

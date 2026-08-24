@@ -1,608 +1,381 @@
 package cn.academy.client.gui;
 
-import cn.academy.AcademyCraft;
-import cn.academy.client.render.util.ACRenderingHelper;
 import cn.academy.Resources;
 import cn.academy.tutorial.ACTutorial;
 import cn.academy.tutorial.TutorialRegistry;
-import cn.academy.tutorial.ViewGroup;
 import cn.academy.tutorial.client.ACMarkdownRenderer;
 import cn.lambdalib2.cgui.CGuiScreen;
 import cn.lambdalib2.cgui.Widget;
-import cn.lambdalib2.cgui.WidgetContainer;
-import cn.lambdalib2.cgui.component.*;
+import cn.lambdalib2.cgui.component.DragBar;
+import cn.lambdalib2.cgui.component.DrawTexture;
+import cn.lambdalib2.cgui.component.ElementList;
+import cn.lambdalib2.cgui.component.TextBox;
+import cn.lambdalib2.cgui.component.Tint;
 import cn.lambdalib2.cgui.component.Transform.HeightAlign;
+import cn.lambdalib2.cgui.component.Transform.WidthAlign;
 import cn.lambdalib2.cgui.event.FrameEvent;
-import cn.lambdalib2.cgui.event.GuiEvent;
 import cn.lambdalib2.cgui.event.LeftClickEvent;
-import cn.lambdalib2.cgui.loader.CGUIDocument;
-import cn.lambdalib2.registry.StateEventCallback;
-import cn.lambdalib2.util.Colors;
-import cn.lambdalib2.util.HudUtils;
+import cn.lambdalib2.render.font.Fonts;
 import cn.lambdalib2.render.font.IFont;
 import cn.lambdalib2.render.font.IFont.FontOption;
-import cn.lambdalib2.util.MathUtils;
-//import cn.lambdalib2.util.Color;
-import cn.lambdalib2.util.GameTimer;
+import cn.lambdalib2.util.Colors;
+import cn.lambdalib2.util.HudUtils;
 import cn.lambdalib2.util.markdown.GLMarkdownRenderer;
 import cn.lambdalib2.util.markdown.MarkdownParser;
-import com.google.common.base.Preconditions;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import org.apache.commons.lang3.tuple.Pair;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.util.Color;
-import org.lwjgl.util.glu.GLU;
+import org.joml.Matrix4f;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.lwjgl.opengl.GL11.*;
-
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class GuiTutorial extends CGuiScreen {
-
-    private static IFont font, fontBold, fontItalic;
-
-    private static WidgetContainer loaded;
-
-    @StateEventCallback
-    private static void __init(FMLInitializationEvent ev) {
-        Resources.preloadMipmapTexture("guis/tutorial/logo0");
-        Resources.preloadMipmapTexture("guis/tutorial/logo1");
-        Resources.preloadMipmapTexture("guis/tutorial/logo2");
-        Resources.preloadMipmapTexture("guis/tutorial/logo3");
-        loaded = CGUIDocument.read(new ResourceLocation("academy:guis/tutorial.xml"));
-        font = Resources.font();
-        fontBold = Resources.fontBold();
-        fontItalic = Resources.fontItalic();
-    }
 
     private static final double REF_WIDTH = 480;
 
-    private final Color GLOW_COLOR = Colors.white();
-    private final FontOption fo_descTitle = new FontOption(10);
+    private static final ResourceLocation TEX_WINDOW = Resources.getTexture("guis/window_tutorial_left");
+    private static final ResourceLocation LOGO0 = Resources.getTexture("guis/tutorial/logo0");
+    private static final ResourceLocation LOGO1 = Resources.getTexture("guis/tutorial/logo1");
+    private static final ResourceLocation LOGO2 = Resources.getTexture("guis/tutorial/logo2");
+    private static final ResourceLocation LOGO3 = Resources.getTexture("guis/tutorial/logo3");
+    private static final ResourceLocation SCROLL1 = Resources.getTexture("guis/button/widget_scroll_1");
+    private static final ResourceLocation SCROLL2 = Resources.getTexture("guis/button/widget_scroll_2");
+    private static final ResourceLocation BTN_LEFT = Resources.getTexture("guis/button/button_left_2");
+    private static final ResourceLocation BTN_RIGHT = Resources.getTexture("guis/button/button_right_2");
 
-    private double cachedWidth = -1;
+    private final IFont font = Resources.font();
+    private final FontOption titleOption = new FontOption(10);
 
-    private final EntityPlayer player;
     private final List<ACTutorial> learned, unlearned;
 
-    private final boolean firstOpen;
+    private Widget frame, listArea;
+    private Widget centerPart, rightWindow;
+    private Widget showWindow, previewArea, tagArea, btnLeft, btnRight;
+    private Widget[] logos;
 
-    private Widget frame;
-    private Widget leftPart, rightPart;
+    private ACTutorial currentTut;
+    private int previewIndex;
+    private int viewIndex;
+    private List<cn.academy.client.gui.tutorial.RecipeViews.PreviewView> currentViews = List.of();
 
-    private Widget listArea;
+    private final Map<ACTutorial, CachedRenderInfo> cached = new HashMap<>();
+    private final Map<Widget, String> tabText = new HashMap<>();
 
-    private Widget showWindow, rightWindow, centerPart;
+    public GuiTutorial() {
+        super();
+        Player player = Minecraft.getInstance().player;
+        Pair<List<ACTutorial>, List<ACTutorial>> p = TutorialRegistry.groupByLearned(player);
+        learned = p.getLeft();
+        unlearned = p.getRight();
+        initUI();
+    }
 
-    private Widget logo0, logo1, logo2, logo3;
-    private Widget showArea, tagArea;
+    @Override
+    public void render(GuiGraphics g, int mx, int my, float partial) {
 
-    // Current displayed tutorial
-    private TutInfo currentTut = null;
+        if (frame != null) {
+            frame.transform.scale = (float) (width / REF_WIDTH);
+            frame.dirty = true;
+        }
+        super.render(g, mx, my, partial);
+    }
 
-    private class CachedRenderInfo {
+    private final class CachedRenderInfo {
         final String title, rawBrief, rawContent;
-        private GLMarkdownRenderer brief_;
-        private GLMarkdownRenderer content_;
+        private GLMarkdownRenderer brief_, content_;
 
-        CachedRenderInfo(String _title, String _brief, String _content) {
-            title = _title;
-            rawBrief = _brief;
-            rawContent = _content;
+        CachedRenderInfo(String title, String brief, String content) {
+            this.title = title;
+            this.rawBrief = brief;
+            this.rawContent = content;
         }
 
         GLMarkdownRenderer getBrief() {
-            if (brief_ == null) {
-                GLMarkdownRenderer renderer = new ACMarkdownRenderer();
-                renderer.setFonts(font, fontBold, fontItalic);
-                renderer.widthLimit_$eq(130);
-                renderer.fontSize_$eq(8);
-                MarkdownParser.accept(rawBrief, renderer);
-
-                brief_ = renderer;
-            }
+            if (brief_ == null) brief_ = build(rawBrief, 130);
             return brief_;
         }
 
         GLMarkdownRenderer getContent() {
-            if (content_ == null) {
-                GLMarkdownRenderer renderer = new ACMarkdownRenderer();
-                renderer.setFonts(font, fontBold, fontItalic);
-                renderer.widthLimit_$eq(150);
-                renderer.fontSize_$eq(8);
-                MarkdownParser.accept(rawContent, renderer);
-
-                content_ = renderer;
-            }
+            if (content_ == null) content_ = build(rawContent, 150);
             return content_;
         }
-    }
 
-    private Map<ACTutorial, CachedRenderInfo> cached = new HashMap<>();
+        private GLMarkdownRenderer build(String raw, float widthLimit) {
+            ACMarkdownRenderer r = new ACMarkdownRenderer();
+            r.setFonts(font, font, font);
+            r.widthLimit = widthLimit;
+            r.fontSize = 8;
+            MarkdownParser.accept(raw, r);
+            return r;
+        }
+    }
 
     private CachedRenderInfo renderInfo(ACTutorial tut) {
-        if (!cached.containsKey(tut)) {
-            String raw = tut.getContent();
-            int i1 = raw.indexOf("![title]"),
-                    i2 = raw.indexOf("![brief]"),
-                    i3 = raw.indexOf("![content]");
-            if (i1 < i2 && i2 < i3 && i1 != -1) {
-                String title = trimHead(raw.substring(i1+8, i2)),
-                        brief = trimHead(raw.substring(i2+8, i3)),
-                        content = trimHead(raw.substring(i3+10));
-                cached.put(tut, new CachedRenderInfo(title, brief, content));
-            } else {
-                throw new RuntimeException("Malformed tutorial " + tut.id);
+        return cached.computeIfAbsent(tut, t -> {
+            String raw = t.getContent();
+            int i1 = raw.indexOf("![title]"), i2 = raw.indexOf("![brief]"), i3 = raw.indexOf("![content]");
+            if (i1 != -1 && i1 < i2 && i2 < i3) {
+                return new CachedRenderInfo(
+
+                        raw.substring(i1 + 8, i2).trim(),
+                        trimHead(raw.substring(i2 + 8, i3)),
+                        trimHead(raw.substring(i3 + 10)));
             }
-        }
-        return cached.get(tut);
+            return new CachedRenderInfo(t.id, "", "");
+        });
     }
 
-    private String trimHead(String str) {
+    private static String trimHead(String str) {
         int idx = 0;
-        while (idx < str.length() &&
-                (str.charAt(idx) == '\r' || str.charAt(idx) == '\n' || str.charAt(idx) == ' ')) {
+        while (idx < str.length() && (str.charAt(idx) == '\r' || str.charAt(idx) == '\n' || str.charAt(idx) == ' ')) {
             idx++;
         }
         return str.substring(idx);
     }
 
-    public GuiTutorial() {
-        player = Minecraft.getMinecraft().player;
-        Pair<List<ACTutorial>, List<ACTutorial>> p = TutorialRegistry.groupByLearned(player);
-        learned = p.getLeft();
-        unlearned = p.getRight();
-
-        final String tagName = "AC_Tutorial_Open";
-        firstOpen = !player.getEntityData().getBoolean(tagName);
-        player.getEntityData().setBoolean(tagName, true);
-
-        initUI();
-    }
-
-    @Override
-    public void drawScreen(int mx, int my, float w) {
-        // Make the whole screen scale with width, for better display effect
-        if(cachedWidth != width) {
-            frame.transform.scale = (float) (width / REF_WIDTH);
-            frame.dirty = true;
-        }
-        cachedWidth = width;
-        super.drawScreen(mx, my, w);
-    }
-
     private void initUI() {
-        frame = loaded.getWidget("frame").copy();
+        frame = newFrame();
 
-        leftPart = frame.getWidget("leftPart");
+        Widget leftPart = frame.getWidget("leftPart");
         listArea = leftPart.getWidget("list");
 
-        rightPart = frame.getWidget("rightPart");
-
-        showWindow = rightPart.getWidget("showWindow");
-        rightWindow = rightPart.getWidget("rightWindow");
+        Widget rightPart = frame.getWidget("rightPart");
         centerPart = rightPart.getWidget("centerPart");
-        logo0 = rightPart.getWidget("logo0");
-        logo1 = rightPart.getWidget("logo1");
-        logo2 = rightPart.getWidget("logo2");
-        logo3 = rightPart.getWidget("logo3");
-
-        showArea = showWindow.getWidget("area");
+        rightWindow = rightPart.getWidget("rightWindow");
+        showWindow = rightPart.getWidget("showWindow");
+        previewArea = showWindow.getWidget("area");
         tagArea = showWindow.getWidget("tag_area");
+        btnLeft = showWindow.getWidget("btn_left");
+        btnRight = showWindow.getWidget("btn_right");
+        logos = new Widget[]{
+                rightPart.getWidget("logo0"), rightPart.getWidget("logo1"),
+                rightPart.getWidget("logo2"), rightPart.getWidget("logo3")
+        };
 
-        showWindow.transform.doesDraw = false;
-        rightWindow.transform.doesDraw = false;
         centerPart.transform.doesDraw = false;
+        rightWindow.transform.doesDraw = false;
+        showWindow.transform.doesDraw = false;
+        btnLeft.transform.doesDraw = false;
+        btnRight.transform.doesDraw = false;
 
-        // Event handlers
-        centerPart.getWidget("text").listen(FrameEvent.class, (w, e) -> {
-            if(currentTut != null) {
-                GLMarkdownRenderer renderer = renderInfo(currentTut.tut).getContent();
+        previewArea.listen(FrameEvent.class, (w, e) -> {
+            if (currentViews.isEmpty()) return;
+            int idx = Math.min(viewIndex, currentViews.size() - 1);
+            currentViews.get(idx).render(w.transform.width, w.transform.height, e.mx, e.my, e.hovering);
+        });
 
-                glPushMatrix();
-                glTranslated(0, 0, 10);
+        btnLeft.listen(LeftClickEvent.class, (w, e) -> cycleView(-1));
+        btnRight.listen(LeftClickEvent.class, (w, e) -> cycleView(1));
 
-                glColorMask(false, false, false, false);
-                glDepthMask(true);
-
-                HudUtils.colorRect(0, 0, w.transform.width, w.transform.height);
-                glColorMask(true, true, true, true);
-
-                double ht = Math.max(0, renderer.getMaxHeight() - w.transform.height + 10);
-                double delta = DragBar.get(centerPart.getWidget("scroll_2")).getProgress() * ht;
-                glTranslated(3, 3 - delta, 0);
-                glDepthFunc(GL_EQUAL);
-                renderer.render();
-                glDepthFunc(GL_LEQUAL);
-                glPopMatrix();
+        tagArea.listen(FrameEvent.class, (w, e) -> {
+            String txt = tabText.get(gui.getHoveringWidget());
+            if (txt != null && !txt.isEmpty()) {
+                font.draw(txt, 0, -8, new FontOption(10));
             }
+        });
+
+        centerPart.getWidget("text").listen(FrameEvent.class, (w, e) -> {
+            if (currentTut == null) return;
+            GLMarkdownRenderer r = renderInfo(currentTut).getContent();
+            double ht = Math.max(0, r.getMaxHeight() - w.transform.height + 10);
+            double delta = DragBar.get(centerPart.getWidget("scroll_2")).getProgress() * ht;
+            drawMarkdown(r, 3, (float) (3 - delta));
         });
 
         rightWindow.getWidget("text").listen(FrameEvent.class, (w, e) -> {
-            if(currentTut != null) {
-                CachedRenderInfo info = renderInfo(currentTut.tut);
-
-                font.draw(info.title, 3, 3, fo_descTitle);
-
-                glPushMatrix();
-                glTranslated(3, 15, 0);
-                info.getBrief().render();
-                glPopMatrix();
-            }
+            if (currentTut == null) return;
+            CachedRenderInfo info = renderInfo(currentTut);
+            font.draw(info.title, 3, 3, titleOption);
+            drawMarkdown(info.getBrief(), 3, 15);
         });
-
-        showArea.listen(FrameEvent.class, (w, e) -> {
-            final Widget view = currentView();
-            if (view == null) {
-                return;
-            }
-
-            glMatrixMode(GL11.GL_PROJECTION);
-            glPushMatrix();
-            glLoadIdentity();
-
-            double scale = 366.0 / width * frame.scale;
-            float aspect = (float) mc.displayWidth / mc.displayHeight;
-
-            glTranslated(
-                    -1 + 2.0 * (w.scale + w.x) / width,
-                    1 - 2.0 * (w.scale + w.y) / height,
-                    0);
-            GL11.glScaled(scale, -scale * aspect, -0.5);
-
-            GLU.gluPerspective(50, 1, 1f, 100);
-
-            glMatrixMode(GL11.GL_MODELVIEW);
-            glPushMatrix();
-            glLoadIdentity();
-
-            // glCullFace(GL_FRONT);
-            // glDisable(GL11.GL_DEPTH_TEST);
-            glDisable(GL11.GL_ALPHA_TEST);
-            glEnable(GL11.GL_BLEND);
-            glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            glCullFace(GL_FRONT);
-            glColor4d(1, 1, 1, 1);
-
-            glTranslated(0, 0, -4);
-
-            glTranslated(.55, .55, .5);
-
-            glScaled(.75, -.75, .75);
-
-            glRotated(-20, 1, 0, 0.1);
-
-            view.post(new ViewRenderEvent());
-
-            glPopMatrix();
-
-            glMatrixMode(GL11.GL_PROJECTION);
-            glPopMatrix();
-
-            glMatrixMode(GL11.GL_MODELVIEW);
-
-            glEnable(GL11.GL_DEPTH_TEST);
-            glEnable(GL11.GL_ALPHA_TEST);
-            glCullFace(GL11.GL_BACK);
-        });
-
-        // Left and right button of the preview view.
-        // It is assumed when event is triggered, current preview is present and can be switched.
-
-        showWindow.getWidget("btn_left").listen(LeftClickEvent.class, (w, e) -> {
-            PreviewInfo info = Preconditions.checkNotNull(currentPreview());
-            info.viewIndex -= 1;
-            if (info.viewIndex < 0) {
-                info.viewIndex = info.subViews.length - 1;
-            }
-
-            updateView();
-        });
-
-        showWindow.getWidget("btn_right").listen(LeftClickEvent.class, (w, e) -> {
-            PreviewInfo info = Preconditions.checkNotNull(currentPreview());
-            info.viewIndex = (info.viewIndex + 1) % info.subViews.length;
-
-            updateView();
-        });
-
-        {
-            FontOption option = new FontOption(10);
-            tagArea.listen(FrameEvent.class, (w, evt) -> {
-                Widget hovering = gui.getHoveringWidget();
-                if (hovering != null) {
-                    ViewGroupButton comp = hovering.getComponent(ViewGroupButton.class);
-                    if (comp != null) {
-                        font.draw(comp.group.getDisplayText(), 0, -8, option);
-                    }
-                }
-            });
-        }
-
-
-        //
-
 
         rebuildList();
 
-        final double ln = 500, ln2 = 300, cl = 50;
-        final float ht = 5;
-        if (!firstOpen) {
-            logo1.listen(FrameEvent.class, (w, e) -> {
-                glPushMatrix();
-                glTranslated(logo1.transform.width / 2, logo1.transform.height / 2 + 15, 0);
-                lineglow(ln - ln2, ln, ht);
-                lineglow(-ln, -(ln - ln2), ht);
-                glPopMatrix();
-            });
-        } else {
-            listArea.transform.doesDraw = false;
-
-            /* Start animation controller */ {
-                blend(logo2, 0.65, 0.3);
-                blend(logo0, 1.75, 0.3);
-                blend(leftPart, 1.75, 0.3);
-                blend(logo1, 1.3, 0.3);
-                blend(logo3, 0.1, 0.3);
-                blendy(logo3, 0.7, 0.4, 63, -36);
-
-                double startTime = GameTimer.getAbsTime();
-                logo1.listen(FrameEvent.class, (__, e) -> {
-                    final double
-                            b1 = 0.3, // Blend stage 1
-                            b2 = 0.2; // Blend stage 2
-
-                    glPushMatrix();
-                    glTranslated(logo1.transform.width / 2, logo1.transform.height / 2 + 15, 0);
-                    double dt = GameTimer.getAbsTime() - startTime - 0.4;
-                    if(dt < 0) dt = 0;
-                    if(dt < b1) {
-                        if(dt > 0) {
-                            double len = MathUtils.lerp(0, ln, dt / b1);
-                            if(len > cl) {
-                                lineglow(cl, len, ht);
-                                lineglow(-len, -cl, ht);
-                            }
-                        }
-                    } else {
-                        double ldt = dt - b1;
-                        if(ldt > b2) {
-                            ldt = b2;
-                        }
-                        double len = ln;
-                        double len2 = MathUtils.lerp(ln - 2 * cl, ln2, ldt / b2);
-                        lineglow(ln - len2, len, ht);
-                        lineglow(-len, -(ln - len2), ht);
-                    }
-
-                    glPopMatrix();
-
-                    listArea.transform.doesDraw = dt > 2.0;
-                });
-            }
-        }
-
-        gui.addWidget("frame", frame);
+        gui.addWidget(frame);
     }
 
-    private void _build(ElementList e1, List<ACTutorial> list, boolean learned) {
-        for(ACTutorial t : list) {
-            Widget w = new Widget();
-            w.transform.setSize(72, 12);
-            w.addComponent(new Tint(Colors.whiteBlend(0.0f), Colors.whiteBlend(0.3f)));
-
-            TextBox box = Resources.newTextBox(new FontOption(10, learned ? Colors.white() : Colors.fromFloatMono(0.6f)));
-            box.xOffset = 3;
-            box.content = renderInfo(t).title;
-            box.localized = true;
-            box.emit = true;
-            box.heightAlign = HeightAlign.CENTER;
-
-            w.listen(LeftClickEvent.class, (__, e) ->
-            {
-                if(currentTut == null) {
-                    // Start blending view area!
-                    for(Widget old : new Widget[] { logo2, logo0, logo1, logo3 }) {
-                        blend(old, 0, 0.3, true);
-                    }
-                    centerPart.transform.doesDraw = learned;
-                    rightWindow.transform.doesDraw = true;
-                    showWindow.transform.doesDraw = true;
-                }
-
-                if (currentTut == null || currentTut.tut != t) {
-                    updateTutorial(t);
-                }
-            });
-
-            w.addComponent(box);
-            e1.addWidget(w);
-        }
+    private void drawMarkdown(GLMarkdownRenderer r, float dx, float dy) {
+        Matrix4f saved = new Matrix4f(HudUtils.getMatrix());
+        HudUtils.setMatrix(new Matrix4f(saved).translate(dx, dy, 0));
+        r.render();
+        HudUtils.setMatrix(saved);
     }
 
     private void rebuildList() {
         listArea.removeComponent(ElementList.class);
         ElementList el = new ElementList();
-        _build(el, learned, true);
-        _build(el, unlearned, false);
+        buildList(el, learned, true);
+        buildList(el, unlearned, false);
         listArea.addComponent(el);
     }
 
-    private void lineglow(double x0, double x1, float ht) {
-        ACRenderingHelper.drawGlow(x0, -1, x1-x0, ht-2, 5, GLOW_COLOR);
-        glColor4d(1, 1, 1, 1);
-        ACRenderingHelper.lineSegment(x0, 0, x1, 0, ht);
+    private void buildList(ElementList el, List<ACTutorial> list, boolean isLearned) {
+        for (ACTutorial t : list) {
+            Widget w = new Widget();
+            w.transform.setSize(72, 12);
+            w.addComponent(new Tint(Colors.whiteBlend(0.0f), Colors.whiteBlend(0.3f), false));
+
+            TextBox box = new TextBox(new FontOption(10, isLearned ? Colors.white() : Colors.fromFloatMono(0.6f)));
+            box.font = Fonts.get("AC_Normal");
+            box.setContent(renderInfo(t).title);
+            box.localized = false;
+            box.heightAlign = HeightAlign.CENTER;
+            w.addComponent(box);
+
+            w.listen(LeftClickEvent.class, (ww, e) -> onSelect(t, isLearned));
+            el.addWidget(w);
+        }
     }
 
-    private void blend(Widget w, double start, double tin) {
-        blend(w, start, tin, false);
-    }
+    private void onSelect(ACTutorial t, boolean isLearned) {
+        currentTut = t;
+        previewIndex = 0;
 
-    private void blend(Widget w, double start, double tin, boolean reverse) {
-        DrawTexture dt = DrawTexture.get(w);
-        double startTime = GameTimer.getAbsTime();
-        int startAlpha = dt.color.getAlpha();
-        dt.color.setAlpha(reverse ? startAlpha : 0);
-
-        w.listen(FrameEvent.class, (__, e) ->
-        {
-            double delta = (GameTimer.getAbsTime() - startTime);
-            float alpha = Colors.i2f(startAlpha) *
-                    (float)MathUtils.clampd(0, 1, delta < start ? 0 : (delta - start < tin ? (delta - start ) / tin : 1));
-            if(reverse) {
-                alpha = 1 - alpha;
-                if(alpha == 0) {
-                    w.dispose();
-                }
-            }
-            dt.color.setAlpha(Colors.f2i(alpha));
-        });
-    }
-
-    private void blendy(Widget w, double start, double tin, double y0, double y1) {
-        double startTime = GameTimer.getAbsTime();
-        w.transform.y = (float) y0;
-        w.dirty = true;
-
-        w.listen(FrameEvent.class, (__, e) ->
-        {
-            double delta = (GameTimer.getAbsTime() - startTime);
-            double lambda = delta < start ? 0 : (delta - start < tin ? (delta - start ) / tin : 1);
-            w.transform.y = (float) MathUtils.lerp(y0, y1, lambda);
-            w.dirty = true;
-        });
-    }
-
-    private void updateTutorial(ACTutorial tut) {
-        currentTut = new TutInfo(tut, tut.isActivated(player));
+        for (Widget logo : logos) logo.transform.doesDraw = false;
+        rightWindow.transform.doesDraw = true;
+        centerPart.transform.doesDraw = isLearned;
+        showWindow.transform.doesDraw = !t.getPreview().isEmpty();
+        buildTabs(t);
+        rebuildViews();
         DragBar.get(centerPart.getWidget("scroll_2")).setProgress(0.0f);
+    }
 
-        centerPart.transform.doesDraw = tut.isActivated(player);
-
+    private void buildTabs(ACTutorial t) {
         tagArea.clear();
+        tabText.clear();
+        java.util.List<cn.academy.tutorial.ViewGroup> pv = t.getPreview();
+        float sz = tagArea.transform.height;
+        float step = sz - 1;
+        float x = 0;
+        for (int i = 0; i < pv.size(); i++) {
+            final int idx = i;
+            Widget tab = new Widget();
+            tab.transform.setSize(sz, sz).setPos(x, 0);
+            tab.addComponent(new DrawTexture(pv.get(i).getTag().icon, Colors.monoBlend(1, 0.7f)));
+            tab.addComponent(new Tint(Colors.monoBlend(1, 0.7f), Colors.monoBlend(1, 1), true));
+            tab.listen(LeftClickEvent.class, (w, e) -> { previewIndex = idx; rebuildViews(); });
+            tagArea.addWidget(tab);
+            tabText.put(tab, pv.get(i).getDisplayText());
+            x += step;
+        }
+    }
 
+    private void rebuildViews() {
+        viewIndex = 0;
+        java.util.List<cn.academy.tutorial.ViewGroup> pv =
+                currentTut == null ? List.of() : currentTut.getPreview();
+        currentViews = (pv.isEmpty() || previewIndex >= pv.size())
+                ? List.of()
+                : cn.academy.client.gui.tutorial.RecipeViews.buildFor(pv.get(previewIndex));
+        boolean multi = currentViews.size() >= 2;
+        btnLeft.transform.doesDraw = multi;
+        btnRight.transform.doesDraw = multi;
+    }
+
+    private void cycleView(int delta) {
+        int n = currentViews.size();
+        if (n < 2) return;
+        viewIndex = ((viewIndex + delta) % n + n) % n;
+    }
+
+    private Widget newFrame() {
+        Widget frame = new Widget();
+        frame.transform.setSize(427, 240).setPos(0, 0).setCenteredAlign();
+        frame.transform.doesDraw = true;
+
+        Widget leftPart = new Widget();
+        leftPart.transform.setSize(85, 220.5f).setPos(7, 0).setAlign(WidthAlign.LEFT, HeightAlign.CENTER);
+        leftPart.addComponent(new DrawTexture(TEX_WINDOW));
+        Widget list = new Widget();
+        list.transform.setSize(72, 207).setPos(6.6f, 7).setAlign(WidthAlign.LEFT, HeightAlign.TOP);
+        leftPart.addWidget("list", list);
+        frame.addWidget("leftPart", leftPart);
+
+        Widget rightPart = new Widget();
+        rightPart.transform.setSize(332, 220.5f).setPos(92, 0).setAlign(WidthAlign.LEFT, HeightAlign.CENTER);
+
+        rightPart.addWidget("logo1", logo(899, 236, 0, 59, LOGO1));
+        rightPart.addWidget("logo0", logo(899, 548, 0, -32.5f, LOGO0));
+
+        Widget centerPart = new Widget();
+        centerPart.transform.setSize(172, 220.5f).setPos(0, 0).setAlign(WidthAlign.LEFT, HeightAlign.CENTER);
+        centerPart.transform.doesDraw = true;
         {
-            float sz = tagArea.transform.height;
-            double step = sz - 1;
+            Widget text = new Widget();
+            text.transform.setSize(160, 210.5f).setPos(2, 0).setAlign(WidthAlign.LEFT, HeightAlign.CENTER);
+            centerPart.addWidget("text", text);
 
-            float x = 0;
+            Widget scroll2 = new Widget();
+            scroll2.transform.setSize(9.5f, 53).setPos(0, 2).setAlign(WidthAlign.RIGHT, HeightAlign.TOP);
+            scroll2.addComponent(new DrawTexture(SCROLL2, new cn.lambdalib2.util.Color(255, 255, 255, 204)));
+            scroll2.addComponent(new DragBar(DragBar.Axis.Y, 2, 165));
+            scroll2.addComponent(new Tint(new cn.lambdalib2.util.Color(255, 255, 255, 204),
+                    new cn.lambdalib2.util.Color(255, 255, 255, 255), true));
+            centerPart.addWidget("scroll_2", scroll2);
 
-            for (int i = 0; i < currentTut.previews.length; ++i) {
-                final int i2 = i;
-                ViewGroup h = currentTut.previews[i].handler;
-                Widget w = new Widget()
-                        .size(sz, sz)
-                        .pos(x, 0)
-                        .addComponent(new ViewGroupButton(h))
-                        .addComponent(new DrawTexture(h.getTag().icon, Colors.monoBlend(1, .7f)))
-                        .addComponent(new Tint(Colors.monoBlend(1, .7f), Colors.monoBlend(1, 1)).setAffectTexture())
-                        .listen(LeftClickEvent.class, (w_, e) -> {
-                            currentTut.previewIndex = i2;
-                            updatePreview();
-                        });
-                tagArea.addWidget(w);
-
-                x += step;
-            }
+            Widget scroll1 = new Widget();
+            scroll1.transform.setSize(9.5f, 216.5f).setPos(0, 0).setAlign(WidthAlign.RIGHT, HeightAlign.CENTER);
+            scroll1.transform.doesListenKey = false;
+            scroll1.addComponent(new DrawTexture(SCROLL1));
+            centerPart.addWidget("scroll_1", scroll1);
         }
+        rightPart.addWidget("centerPart", centerPart);
 
-        updatePreview();
-    }
+        Widget showWindow = new Widget();
+        showWindow.transform.setSize(158.5f, 136).setPos(0, 0).setAlign(WidthAlign.RIGHT, HeightAlign.TOP);
+        showWindow.transform.doesDraw = true;
+        {
+            Widget area = new Widget();
+            area.transform.setSize(134, 134).setPos(0, -2).setAlign(WidthAlign.CENTER, HeightAlign.CENTER);
+            showWindow.addWidget("area", area);
 
-    private PreviewInfo currentPreview() {
-        return currentTut == null ? null : currentTut.currentPreview();
-    }
+            Widget tagAreaW = new Widget();
+            tagAreaW.transform.setSize(133, 18).setPos(12, 120.75f).setAlign(WidthAlign.LEFT, HeightAlign.TOP);
+            showWindow.addWidget("tag_area", tagAreaW);
 
-    private Widget currentView() {
-        PreviewInfo cp = currentPreview();
-        return cp == null ? null : cp.currentView();
-    }
-
-    private void updateView() {
-        showArea.removeWidget("delegate");
-
-        Widget view = currentView();
-        if (view != null) {
-            showArea.addWidget("delegate", view);
+            showWindow.addWidget("btn_left", arrowButton(5f, 41.75f, BTN_LEFT));
+            showWindow.addWidget("btn_right", arrowButton(140f, 41.75f, BTN_RIGHT));
         }
-    }
+        rightPart.addWidget("showWindow", showWindow);
 
-    private void updatePreview() {
-        PreviewInfo current = currentPreview();
-
-        Widget btn_left = showWindow.getWidget("btn_left");
-        Widget btn_right = showWindow.getWidget("btn_right");
-
-        boolean hides = current == null || current.subViews.length < 2;
-
-        btn_left.transform.doesDraw = !hides;
-        btn_right.transform.doesDraw = !hides;
-
-        updateView();
-    }
-
-    private class TutInfo {
-        final ACTutorial tut;
-        final boolean learned;
-
-        final PreviewInfo[] previews;
-        int previewIndex;
-
-        TutInfo(ACTutorial _tut, boolean _learned) {
-            tut = _tut;
-            learned = _learned;
-
-            previews = tut.getPreview().stream()
-                    .map(PreviewInfo::new)
-                    .toArray(PreviewInfo[]::new);
+        Widget rightWindow = new Widget();
+        rightWindow.transform.setSize(158.5f, 82).setPos(0, 0).setAlign(WidthAlign.RIGHT, HeightAlign.BOTTOM);
+        rightWindow.addComponent(new DrawTexture(TEX_WINDOW));
+        {
+            Widget text = new Widget();
+            text.transform.setSize(146, 69).setPos(0, -0.25f).setAlign(WidthAlign.CENTER, HeightAlign.CENTER);
+            rightWindow.addWidget("text", text);
         }
+        rightPart.addWidget("rightWindow", rightWindow);
 
-        public PreviewInfo currentPreview() {
-            return previews.length == 0 ? null : previews[previewIndex];
-        }
+        rightPart.addWidget("logo3", logo(149, 149, 0, -36, LOGO3));
+        rightPart.addWidget("logo2", logo(899, 236, 0, 59, LOGO2));
+
+        frame.addWidget("rightPart", rightPart);
+        return frame;
     }
 
-    private class PreviewInfo {
-        final ViewGroup handler;
-        final Widget[] subViews;
-        int viewIndex;
-
-        public PreviewInfo(ViewGroup handler) {
-            this.handler = handler;
-            subViews = handler.getSubViews();
-        }
-
-        public Widget currentView() {
-            return subViews.length == 0 ? null : subViews[viewIndex];
-        }
+    private Widget logo(float w, float h, float x, float y, ResourceLocation tex) {
+        Widget lg = new Widget();
+        lg.transform.setSize(w, h).setPos(x, y).setAlign(WidthAlign.CENTER, HeightAlign.CENTER);
+        lg.transform.scale = 0.25f;
+        lg.addComponent(new DrawTexture(tex));
+        return lg;
     }
 
-    private class ViewGroupButton extends Component {
-
-        public final ViewGroup group;
-
-        public ViewGroupButton(ViewGroup _group) {
-            super("VGB");
-            group = _group;
-        }
-
-    }
-
-    private void debug(Object msg) {
-        AcademyCraft.log.info("[Tut] " + msg);
-    }
-
-    public class ViewRenderEvent implements GuiEvent {
+    private Widget arrowButton(float x, float y, ResourceLocation tex) {
+        Widget btn = new Widget();
+        btn.transform.setSize(30, 130).setPos(x, y).setAlign(WidthAlign.LEFT, HeightAlign.TOP);
+        btn.transform.scale = 0.4f;
+        btn.addComponent(new DrawTexture(tex, Colors.monoBlend(1, 0.7f)));
+        btn.addComponent(new Tint(Colors.monoBlend(1, 0.7f), Colors.monoBlend(1, 1), true));
+        return btn;
     }
 }

@@ -1,67 +1,65 @@
 package cn.academy.ability.ctrl;
 
+import cn.academy.AcademyCraft;
 import cn.academy.ability.context.ClientRuntime;
+import cn.academy.client.auxgui.PresetEditUI;
+import cn.academy.client.auxgui.CPBar;
 import cn.academy.datapart.AbilityData;
 import cn.academy.datapart.CPData;
 import cn.academy.datapart.PresetData;
+import cn.academy.event.ConfigModifyEvent;
 import cn.academy.event.ability.FlushControlEvent;
 import cn.academy.event.ability.PresetSwitchEvent;
-import cn.academy.client.auxgui.CPBar;
-import cn.academy.client.auxgui.PresetEditUI;
-import cn.academy.AcademyCraft;
-import cn.academy.event.ConfigModifyEvent;
-import cn.academy.util.RegACKeyHandler;
 import cn.academy.terminal.app.settings.PropertyElements;
 import cn.academy.terminal.app.settings.SettingsUI;
-import cn.lambdalib2.registry.StateEventCallback;
-import cn.lambdalib2.registry.mc.RegEventHandler;
-import cn.lambdalib2.util.GameTimer;
+import cn.academy.util.ACKeyManager;
 import cn.lambdalib2.input.KeyHandler;
 import cn.lambdalib2.input.KeyManager;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import cn.lambdalib2.util.GameTimer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.config.Configuration;
-import org.lwjgl.input.Keyboard;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import org.lwjgl.glfw.GLFW;
 
-/**
- * Misc key event listener for skill events.
- */
-@SideOnly(Side.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public final class ClientHandler {
 
-    // Name constants for looking up keys in ACKeyHandler.
-    public static final String
-        KEY_SWITCH_PRESET = "switch_preset",
-        KEY_EDIT_PRESET = "edit_preset",
-        KEY_ACTIVATE_ABILITY = "ability_activation";
+    private ClientHandler() {}
 
-    private static final int[] keyIDsInit = new int[] {
+    public static final String
+            KEY_SWITCH_PRESET = "switch_preset",
+            KEY_EDIT_PRESET = "edit_preset",
+            KEY_ACTIVATE_ABILITY = "ability_activation";
+
+    private static final int[] keyIDsInit = new int[]{
             KeyManager.MOUSE_LEFT,
             KeyManager.MOUSE_RIGHT,
-            Keyboard.KEY_R,
-            Keyboard.KEY_F
+            GLFW.GLFW_KEY_R,
+            GLFW.GLFW_KEY_F
     };
 
     private static final int[] keyIDs = new int[keyIDsInit.length];
 
-    @StateEventCallback
-    private static void init(FMLInitializationEvent ev) {
+    public static void init() {
         updateAbilityKeys();
         for (int i = 0; i < keyIDsInit.length; ++i) {
             SettingsUI.addProperty(PropertyElements.KEY, "keys", "ability_" + i, keyIDsInit[i], false);
         }
+
+        ACKeyManager.instance.addKeyHandler(KEY_EDIT_PRESET, "", GLFW.GLFW_KEY_N, keyEditPreset);
+        ACKeyManager.instance.addKeyHandler(KEY_ACTIVATE_ABILITY, "", GLFW.GLFW_KEY_V, keyActivate);
+        ACKeyManager.instance.addKeyHandler(KEY_SWITCH_PRESET, "", GLFW.GLFW_KEY_C, keySwitchPreset);
+
+        MinecraftForge.EVENT_BUS.register(new ConfigHandler());
     }
 
     private static void updateAbilityKeys() {
-        Configuration cfg = AcademyCraft.config;
+        cn.academy.config.Configuration cfg = AcademyCraft.config;
         for (int i = 0; i < getKeyCount(); ++i) {
-            keyIDs[i] = cfg.getInt("ability_" + i, "keys",
-                    keyIDsInit[i], -1000, 1000, "Ability control key #" + i);
+            keyIDs[i] = cfg.getInt("ability_" + i, "keys", keyIDsInit[i], "Ability control key #" + i);
         }
 
         MinecraftForge.EVENT_BUS.post(new FlushControlEvent());
@@ -74,24 +72,57 @@ public final class ClientHandler {
     public static int getKeyCount() {
         return keyIDsInit.length;
     }
-    
-    /**
-     * The key to activate and deactivate the ability, might have other uses in certain circumstances,
-     *  e.g. quit charging when using ability.
-     */
-    @RegACKeyHandler(name = KEY_ACTIVATE_ABILITY, keyID = Keyboard.KEY_V)
-    public static KeyHandler keyActivate = new KeyHandler() {
+
+    private static boolean academy$notReady(Player player) {
+        return player == null || !cn.lambdalib2.datapart.EntityData.isReady(player);
+    }
+
+    public static final KeyHandler keyActivate = new KeyHandler() {
 
         double lastKeyDown;
 
+        boolean armed;
+
         @Override
         public void onKeyUp() {
+
+            boolean paired = armed;
+            armed = false;
             double delta = GameTimer.getTime() - lastKeyDown;
-            if (delta < 0.300) {
-                EntityPlayer player = getPlayer();
+
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (cn.academy.util.ACDiag.ON)
+                org.apache.logging.log4j.LogManager.getLogger("AcademyCraft/Keys").warn(
+                        "[key-v] onKeyUp | delta={} | pairedKeyDown={} | willToggleActivation={} | currentScreen={}",
+                        String.format("%.4f", delta), paired, paired && delta < 0.300,
+                        mc.screen == null ? "none" : mc.screen.getClass().getName());
+            } catch (Throwable ignored) {
+
+            }
+            if (paired && delta < 0.300) {
+                Player player = getPlayer();
+
+                if (academy$notReady(player)) {
+                    CPBar.instance.stopDisplayNumbers();
+                    return;
+                }
+
+                if (cn.academy.client.gui.RemoteControlScreen.tryOpenFromKey(player)) {
+                    CPBar.instance.stopDisplayNumbers();
+                    return;
+                }
+
                 AbilityData aData = AbilityData.get(player);
 
-                if(aData.hasCategory()) {
+                if (aData.hasCategory()) {
+
+                    CPData cpData = CPData.get(player);
+                    if (!cpData.isActivated()
+                            && cn.academy.ability.vanilla.mentalout.passiveskill.WideCast
+                                    .unlocked(player)) {
+                        return;
+                    }
                     ClientRuntime.instance().getActivateHandler().onKeyDown(player);
                 }
             }
@@ -102,29 +133,37 @@ public final class ClientHandler {
         @Override
         public void onKeyDown() {
             lastKeyDown = GameTimer.getTime();
+            armed = true;
             CPBar.instance.startDisplayNumbers();
         }
-        
+
     };
-    
-    @RegACKeyHandler(name = KEY_EDIT_PRESET, keyID = Keyboard.KEY_N)
-    public static KeyHandler keyEditPreset = new KeyHandler() {
+
+    public static final KeyHandler keyEditPreset = new KeyHandler() {
         @Override
         public void onKeyDown() {
-            if(AbilityData.get(getPlayer()).hasCategory()) {
-                Minecraft.getMinecraft().displayGuiScreen(new PresetEditUI());
+            Player player = getPlayer();
+            if (academy$notReady(player)) {
+                return;
+            }
+            if (AbilityData.get(player).hasCategory()) {
+                Minecraft.getInstance().setScreen(new PresetEditUI());
             }
         }
     };
-    
-    @RegACKeyHandler(name = KEY_SWITCH_PRESET, keyID = Keyboard.KEY_C)
-    public static KeyHandler keySwitchPreset = new KeyHandler() {
+
+    public static final KeyHandler keySwitchPreset = new KeyHandler() {
         @Override
         public void onKeyDown() {
-            PresetData data = PresetData.get(getPlayer());
-            CPData cpData = CPData.get(getPlayer());
-            
-            if(cpData.isActivated()) {
+            Player player = getPlayer();
+            if (academy$notReady(player)) {
+                return;
+            }
+            PresetData data = PresetData.get(player);
+            CPData cpData = CPData.get(player);
+
+            if (cpData.isActivated()) {
+
                 int next = (data.getCurrentID() + 1) % PresetData.MAX_PRESETS;
                 data.switchFromClient(next);
                 MinecraftForge.EVENT_BUS.post(new PresetSwitchEvent(data.getEntity()));
@@ -132,11 +171,8 @@ public final class ClientHandler {
         }
     };
 
-
-    @SideOnly(Side.CLIENT)
-    public enum ConfigHandler {
-        @RegEventHandler()
-        instance;
+    @OnlyIn(Dist.CLIENT)
+    public static class ConfigHandler {
 
         @SubscribeEvent
         public void onConfigModify(ConfigModifyEvent evt) {

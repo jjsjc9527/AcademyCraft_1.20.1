@@ -1,28 +1,26 @@
 package cn.academy.ability;
 
 import cn.academy.ability.develop.DeveloperType;
-import net.minecraft.client.resources.I18n;
+import net.minecraft.network.chat.Component;
 
-/**
- * This class should be used only in client part.
- */
+import java.util.Locale;
+
 public enum AbilityLocalization {
     instance;
-    
+
     public String levelDesc(int level) {
-        return I18n.format("ac.ability.level" + level);
+        return Component.translatable("ability.academy.level" + level).getString();
     }
-    
+
     public String machineType(DeveloperType type) {
-        return local("type_" + type.toString().toLowerCase());
+        return local("type_" + type.toString().toLowerCase(Locale.ROOT));
     }
-    
+
     public String local(String key) {
-        return I18n.format("ac.skill_tree." + key);
+        return Component.translatable("gui.academy.skill_tree." + key).getString();
     }
-    
-    public String local(String key, Object ...args) {
-        return I18n.format("ac.skill_tree." + key, args);
+
+    public String local(String key, Object... args) {
+        return Component.translatable("gui.academy.skill_tree." + key, args).getString();
     }
-    
 }

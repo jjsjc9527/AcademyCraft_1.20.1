@@ -1,1 +1,14 @@
-{"defaults":{"model":"academy:node_base"},"forge_marker":1,"variants":{"connected":{"false":{"textures":{"vert":"academy:blocks/node_top_0"}},"true":{"textures":{"vert":"academy:blocks/node_top_1"}}},"energy":{"0":{"textures":{"side":"academy:blocks/node_standard_side_0"}},"1":{"textures":{"side":"academy:blocks/node_standard_side_1"}},"2":{"textures":{"side":"academy:blocks/node_standard_side_2"}},"3":{"textures":{"side":"academy:blocks/node_standard_side_3"}},"4":{"textures":{"side":"academy:blocks/node_standard_side_4"}}},"inventory":[{"textures":{"side":"academy:blocks/node_standard_side_0","vert":"academy:blocks/node_top_0"}}]},"__xconfgen":true}
+{
+  "variants": {
+    "connected=false,energy=0": { "model": "academy:block/node_standard_e0_c0" },
+    "connected=false,energy=1": { "model": "academy:block/node_standard_e1_c0" },
+    "connected=false,energy=2": { "model": "academy:block/node_standard_e2_c0" },
+    "connected=false,energy=3": { "model": "academy:block/node_standard_e3_c0" },
+    "connected=false,energy=4": { "model": "academy:block/node_standard_e4_c0" },
+    "connected=true,energy=0": { "model": "academy:block/node_standard_e0_c1" },
+    "connected=true,energy=1": { "model": "academy:block/node_standard_e1_c1" },
+    "connected=true,energy=2": { "model": "academy:block/node_standard_e2_c1" },
+    "connected=true,energy=3": { "model": "academy:block/node_standard_e3_c1" },
+    "connected=true,energy=4": { "model": "academy:block/node_standard_e4_c1" }
+  }
+}

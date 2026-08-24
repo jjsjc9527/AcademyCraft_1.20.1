@@ -1,1 +1,34 @@
-{"defaults":{"model":"cube","textures":{"down":"academy:blocks/machine_bottom","east":"#side","front":"academy:blocks/ief_off","north":"#front","particle":"#side","side":"academy:blocks/machine_side","south":"#side","up":"academy:blocks/machine_top","west":"#side"}},"forge_marker":1,"variants":{"facing":{"east":{"y":90},"north":{"y":0},"south":{"y":180},"west":{"y":270}},"frame":{"0":{},"1":{"textures":{"front":"academy:blocks/ief_working_1"}},"2":{"textures":{"front":"academy:blocks/ief_working_2"}},"3":{"textures":{"front":"academy:blocks/ief_working_3"}},"4":{"textures":{"front":"academy:blocks/ief_working_4"}}},"inventory":[{}]},"__xconfgen":true}
+{
+  "variants": {
+    "facing=north,working=false": {
+      "model": "academy:block/imag_fusor"
+    },
+    "facing=north,working=true": {
+      "model": "academy:block/imag_fusor_on"
+    },
+    "facing=east,working=false": {
+      "model": "academy:block/imag_fusor",
+      "y": 90
+    },
+    "facing=east,working=true": {
+      "model": "academy:block/imag_fusor_on",
+      "y": 90
+    },
+    "facing=south,working=false": {
+      "model": "academy:block/imag_fusor",
+      "y": 180
+    },
+    "facing=south,working=true": {
+      "model": "academy:block/imag_fusor_on",
+      "y": 180
+    },
+    "facing=west,working=false": {
+      "model": "academy:block/imag_fusor",
+      "y": 270
+    },
+    "facing=west,working=true": {
+      "model": "academy:block/imag_fusor_on",
+      "y": 270
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/solar_gen.obj",
+  "flip_v": true,
+  "textures": {
+    "solar": "academy:block/solar",
+    "particle": "academy:item/solar_gen"
+  }
+}

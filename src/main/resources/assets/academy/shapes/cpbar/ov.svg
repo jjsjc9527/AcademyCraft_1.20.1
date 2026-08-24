@@ -1,0 +1,13 @@
+<svg id="图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960.51 133.79">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #e11f32;
+      }
+    </style>
+  </defs>
+  <g id="过载值">
+    <polygon class="cls-1" points="112.52 108.27 71.53 66.99 777.8 66.99 777.8 108.27 112.52 108.27"/>
+    <path d="M776.81,68v39.28H112.94L73.93,68H776.81m2-2H69.12l43,43.28h666.7V66Z"/>
+  </g>
+</svg>

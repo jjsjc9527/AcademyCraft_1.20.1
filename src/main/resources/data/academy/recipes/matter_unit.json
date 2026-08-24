@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ " P ", "PGP", " P " ], "key": { "P": { "item": "academy:constraint_plate" }, "G": { "item": "minecraft:glass" } }, "result": { "item": "academy:matter_unit", "count": 4 } }

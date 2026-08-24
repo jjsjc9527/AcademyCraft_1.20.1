@@ -1,0 +1,16 @@
+{
+    "replace": false,
+    "values": [
+        "academy:constraint_metal",
+        "academy:deepslate_constraint_metal",
+        "academy:node_basic",
+        "academy:node_standard",
+        "academy:node_advanced",
+        "academy:wireless_generator",
+        "academy:phase_gen",
+        "academy:imag_fusor",
+        "academy:metal_former",
+        "academy:ability_interferer",
+        "academy:wireless_receiver"
+    ]
+}

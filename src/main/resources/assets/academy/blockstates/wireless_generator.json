@@ -1,0 +1,5 @@
+{
+    "variants": {
+        "": { "model": "academy:block/wireless_generator" }
+    }
+}

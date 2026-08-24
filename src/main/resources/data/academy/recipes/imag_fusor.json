@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ "PCP", "AMA", "PUP" ], "key": { "P": { "item": "academy:constraint_plate" }, "C": { "item": "academy:crystal_low" }, "A": { "item": "academy:calc_chip" }, "M": { "item": "academy:machine_frame" }, "U": { "item": "academy:matter_unit" } }, "result": { "item": "academy:imag_fusor" } }

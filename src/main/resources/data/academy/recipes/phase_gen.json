@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ "CMC", "U U" ], "key": { "C": { "item": "academy:crystal_low" }, "M": { "item": "academy:machine_frame" }, "U": { "item": "academy:matter_unit" } }, "result": { "item": "academy:phase_gen" } }

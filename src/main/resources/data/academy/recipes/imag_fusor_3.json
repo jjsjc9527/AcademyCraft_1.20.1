@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ " C ", "EMA", " U " ], "key": { "C": { "item": "academy:crystal_low" }, "A": { "item": "academy:calc_chip" }, "M": { "item": "academy:machine_frame" }, "E": { "item": "academy:energy_convert_component" }, "U": { "item": "academy:matter_unit" } }, "result": { "item": "academy:imag_fusor" } }

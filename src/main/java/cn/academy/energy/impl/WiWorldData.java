@@ -1,74 +1,101 @@
 package cn.academy.energy.impl;
 
 import cn.academy.AcademyCraft;
-import cn.academy.energy.api.block.*;
-import cn.academy.energy.impl.VBlocks.*;
+import cn.academy.energy.api.block.IWirelessGenerator;
+import cn.academy.energy.api.block.IWirelessMatrix;
+import cn.academy.energy.api.block.IWirelessNode;
+import cn.academy.energy.api.block.IWirelessReceiver;
+import cn.academy.energy.api.block.IWirelessUser;
+import cn.academy.energy.impl.VBlocks.VNGenerator;
+import cn.academy.energy.impl.VBlocks.VNNode;
+import cn.academy.energy.impl.VBlocks.VNReceiver;
+import cn.academy.energy.impl.VBlocks.VWMatrix;
+import cn.academy.energy.impl.VBlocks.VWNode;
 import cn.lambdalib2.util.IBlockSelector;
 import cn.lambdalib2.util.WorldUtils;
-import net.minecraft.block.Block;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraft.world.storage.MapStorage;
-import net.minecraft.world.storage.WorldSavedData;
-//import net.minecraft.world.WorldSavedData;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-/**
- * @author WeAthFolD
- *
- */
-public class WiWorldData extends WorldSavedData {
-    
-    public static final String ID = "AC_WEN_";
-    
-    static String getID(World world) {
-        return ID + world.provider.getDimension();
-    }
-    
-    //Set by get method, which should be the ONLY way to access WiWorldData
-    World world;
+public class WiWorldData extends SavedData {
 
-    public WiWorldData(String fuckyoumojang) {
-        super(fuckyoumojang);
-    }
-    
-    //-----WEN-----
-    
-    private IBlockSelector filterWirelessBlocks = new IBlockSelector() {
+    public static final String ID = "ac_wen";
 
-        @Override
-        public boolean accepts(World world, int x, int y, int z, Block block) {
-            TileEntity te = world.getTileEntity(new net.minecraft.util.math.BlockPos(x, y, z));
-            return te instanceof IWirelessMatrix || te instanceof IWirelessNode;
-        }
-        
+    Level world;
+
+    private final IBlockSelector filterWirelessBlocks = (world, x, y, z, block) -> {
+        BlockEntity te = world.getBlockEntity(new BlockPos(x, y, z));
+        return te instanceof IWirelessMatrix || te instanceof IWirelessNode;
     };
-    
-    /***
-     * Object valid for lookup: VWMatrix, VWNode
-     */
+
     Map<Object, WirelessNet> netLookup = new HashMap<>();
     Set<WirelessNet> netList = new HashSet<>();
-    
-    /**
-     * Internal, used to prevent concurrent modification.
-     */
     private List<WirelessNet> toRemove = new ArrayList<>();
-    
+
+    Map<Object, NodeConn> nodeLookup = new HashMap<>();
+    Set<NodeConn> nodeList = new HashSet<>();
+    List<NodeConn> nToRemove = new ArrayList<>();
+
+    private final List<BlockPos> _bufferBlockPos = new ArrayList<>();
+
+    public WiWorldData() {}
+
+    public static WiWorldData load(CompoundTag tag) {
+        WiWorldData d = new WiWorldData();
+        d.readFromNBT(tag);
+        return d;
+    }
+
+    @Override
+    public CompoundTag save(CompoundTag tag) {
+        writeToNBT(tag);
+        return tag;
+    }
+
+    public static WiWorldData get(Level world) {
+        if (world.isClientSide()) {
+            throw new RuntimeException("Not allowed to create WiWorldData in client");
+        }
+        ServerLevel sl = (ServerLevel) world;
+        WiWorldData ret = sl.getDataStorage().computeIfAbsent(WiWorldData::load, WiWorldData::new, ID);
+        ret.world = world;
+        return ret;
+    }
+
+    public static WiWorldData getNonCreate(Level world) {
+        if (world.isClientSide()) {
+            return null;
+        }
+        ServerLevel sl = (ServerLevel) world;
+        WiWorldData data = sl.getDataStorage().get(WiWorldData::load, ID);
+        if (data != null) data.world = world;
+        return data;
+    }
+
     private void tickNetwork() {
-        for(WirelessNet net : toRemove) {
+        for (WirelessNet net : toRemove) {
             this.doRemoveNetwork(net);
         }
         toRemove.clear();
-        
+
         Iterator<WirelessNet> iter = netList.iterator();
         while (iter.hasNext()) {
             WirelessNet net = iter.next();
-            if(net.isDisposed()) {
+            if (net.isDisposed()) {
                 toRemove.add(net);
             } else {
                 net.world = world;
@@ -76,115 +103,110 @@ public class WiWorldData extends WorldSavedData {
             }
         }
     }
-    
+
     boolean createNetwork(IWirelessMatrix matrix, String ssid, String password) {
-        // Kill old net of the same matrix, if any
         VWMatrix vm = new VWMatrix(matrix);
-        if(netLookup.containsKey(vm)) {
+        if (netLookup.containsKey(vm)) {
             WirelessNet old = netLookup.get(vm);
             doRemoveNetwork(old);
         }
-        
-        //Add new
+
         WirelessNet net = new WirelessNet(this, vm, ssid, password);
         doAddNetwork(net);
-        
+
         return true;
     }
 
-    private final List<BlockPos> _bufferBlockPos = new ArrayList<>();
-    
     public Collection<WirelessNet> rangeSearch(int x, int y, int z, double range, int max) {
         WorldUtils.getBlocksWithin(_bufferBlockPos, world, x, y, z, range, max, filterWirelessBlocks);
-        
+
         Set<WirelessNet> set = new HashSet<>();
-        for(BlockPos bp : _bufferBlockPos) {
-            TileEntity te = world.getTileEntity(bp);
+        for (BlockPos bp : _bufferBlockPos) {
+            BlockEntity te = world.getBlockEntity(bp);
             WirelessNet net;
-            if(te instanceof IWirelessMatrix) {
+            if (te instanceof IWirelessMatrix) {
                 net = getNetwork((IWirelessMatrix) te);
-            } else if(te instanceof IWirelessNode) {
+            } else if (te instanceof IWirelessNode) {
                 net = getNetwork((IWirelessNode) te);
             } else {
-                throw new RuntimeException("Invalid TileEntity");
+                throw new RuntimeException("Invalid BlockEntity");
             }
-            if(net != null && net.isInRange(x, y, z) && net.getLoad() < net.getCapacity()) {
+            if (net != null && net.isInRange(x, y, z) && net.getLoad() < net.getCapacity()) {
                 set.add(net);
-                if(set.size() >= max)
+                if (set.size() >= max)
                     return set;
             }
         }
 
         return set;
     }
-    
+
     public WirelessNet getNetwork(IWirelessMatrix matrix) {
         return privateGetNetwork(new VWMatrix(matrix));
     }
-    
+
     public WirelessNet getNetwork(IWirelessNode node) {
         return privateGetNetwork(new VWNode(node));
     }
 
     private WirelessNet privateGetNetwork(Object key) {
         WirelessNet ret = netLookup.get(key);
-        if (ret != null && ret.validate()) {
-            return ret;
-        } else {
-            return null;
+        if (ret != null) {
+
+            ret.world = world;
+            if (ret.validate()) {
+                return ret;
+            }
         }
+        return null;
     }
-    
+
     private void doRemoveNetwork(WirelessNet net) {
         netList.remove(net);
         net.onCleanup(this);
     }
-    
+
     private void doAddNetwork(WirelessNet net) {
         netList.add(net);
         net.onCreate(this);
     }
-    
-    private void loadNetwork(NBTTagCompound tag) {
-        NBTTagList list = (NBTTagList) tag.getTag("networks");
-        for(int i = 0; i < list.tagCount(); ++i) {
-            NBTTagCompound tag2 = list.getCompoundTagAt(i);
+
+    private void loadNetwork(CompoundTag tag) {
+        ListTag list = tag.getList("networks", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); ++i) {
+            CompoundTag tag2 = list.getCompound(i);
             WirelessNet net = new WirelessNet(this, tag2);
             doAddNetwork(net);
         }
     }
-    
-    private void saveNetwork(NBTTagCompound tag) {
-        NBTTagList list = new NBTTagList();
-        for(WirelessNet net : netList) {
-            if(!net.isDisposed()) {
-                list.appendTag(net.toNBT());
+
+    private void saveNetwork(CompoundTag tag) {
+        ListTag list = new ListTag();
+        for (WirelessNet net : netList) {
+            if (!net.isDisposed()) {
+                list.add(net.toNBT());
             }
         }
-        tag.setTag("networks", list);
+        tag.put("networks", list);
     }
-    
-    //-----NodeConn----
-    Map<Object, NodeConn> nodeLookup = new HashMap<>();
-    Set<NodeConn> nodeList = new HashSet<>();
-    List<NodeConn> nToRemove = new ArrayList<>();
-    
-    /**
-     * Get the node connection of a node. If not found will create a new one. Never returns null.
-     */
+
     public NodeConn getNodeConnection(IWirelessNode node) {
         VNNode vnn = new VNNode(node);
         NodeConn ret = privateGetNodeConn(vnn);
-        if(ret == null) {
+        if (ret == null) {
             doAddNode(ret = new NodeConn(this, vnn));
         }
         return ret;
     }
-    
+
+    public NodeConn getNodeConnectionNonCreate(IWirelessNode node) {
+        return privateGetNodeConn(new VNNode(node));
+    }
+
     public NodeConn getNodeConnection(IWirelessUser user) {
-        if(user instanceof IWirelessGenerator) {
+        if (user instanceof IWirelessGenerator) {
             return privateGetNodeConn(new VNGenerator((IWirelessGenerator) user));
-        } else if(user instanceof IWirelessReceiver) {
+        } else if (user instanceof IWirelessReceiver) {
             return privateGetNodeConn(new VNReceiver((IWirelessReceiver) user));
         } else if (user == null) {
             return null;
@@ -201,113 +223,78 @@ public class WiWorldData extends WorldSavedData {
             return null;
         }
     }
-    
+
     private void tickNode() {
-        //if(true) return;
-        
-        for(NodeConn nc : nToRemove) {
+        for (NodeConn nc : nToRemove) {
             doRemoveNode(nc);
         }
         nToRemove.clear();
-        
+
         Iterator<NodeConn> iter = nodeList.iterator();
-        while(iter.hasNext()) {
+        while (iter.hasNext()) {
             NodeConn conn = iter.next();
-            if(conn.isDisposed()) {
+            if (conn.isDisposed()) {
                 nToRemove.add(conn);
             } else {
                 conn.tick();
             }
         }
     }
-    
+
     private void doAddNode(NodeConn conn) {
         nodeList.add(conn);
         conn.onAdded(this);
     }
-    
+
     private void doRemoveNode(NodeConn conn) {
         nodeList.remove(conn);
         conn.onCleanup(this);
     }
-    
-    private void loadNode(NBTTagCompound tag) {
-        NBTTagList list = (NBTTagList) tag.getTag("list");
-        debug("LoadNode " + list + (list.tagCount()));
-        for(int i = 0; i < list.tagCount(); ++i) {
-            doAddNode(new NodeConn(this, list.getCompoundTagAt(i)));
+
+    private void loadNode(CompoundTag tag) {
+        ListTag list = tag.getList("list", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); ++i) {
+            doAddNode(new NodeConn(this, list.getCompound(i)));
         }
     }
-    
-    private void saveNode(NBTTagCompound tag) {
-        NBTTagList list = new NBTTagList();
-        for(NodeConn c : nodeList) {
-            if(!c.isDisposed()) {
-                list.appendTag(c.toNBT());
+
+    private void saveNode(CompoundTag tag) {
+        ListTag list = new ListTag();
+        for (NodeConn c : nodeList) {
+            if (!c.isDisposed()) {
+                list.add(c.toNBT());
             }
         }
-        tag.setTag("list", list);
+        tag.put("list", list);
     }
-    
-    //-----Generic-----
+
     public void tick() {
         tickNetwork();
         tickNode();
-    }
-    
-    @Override
-    public void readFromNBT(NBTTagCompound tag) {
-        
-        NBTTagCompound tag1 = (NBTTagCompound) tag.getTag("net");
-        if(tag1 != null)
-            loadNetwork(tag1);
-        
-        tag1 = (NBTTagCompound) tag.getTag("node");
-        if(tag1 != null)
-            loadNode(tag1);
+        setDirty();
     }
 
-    @Override
-    public NBTTagCompound writeToNBT(NBTTagCompound tag) {
-        NBTTagCompound tag1 = new NBTTagCompound();
+    void readFromNBT(CompoundTag tag) {
+        if (tag.contains("net")) {
+            loadNetwork(tag.getCompound("net"));
+        }
+        if (tag.contains("node")) {
+            loadNode(tag.getCompound("node"));
+        }
+    }
+
+    void writeToNBT(CompoundTag tag) {
+        CompoundTag tag1 = new CompoundTag();
         saveNetwork(tag1);
-        tag.setTag("net", tag1);
-        
-        tag1 = new NBTTagCompound();
-        saveNode(tag1);
-        tag.setTag("node", tag1);
-        return tag;
-    }
-    
-    public static WiWorldData get(World world) {
-        if(world.isRemote) {
-            throw new RuntimeException("Not allowed to create WiWorldData in client");
-        }
-//        MapStorage storage = IS_GLOBAL ? world.getMapStorage() : world.getPerWorldStorage();
-        MapStorage storage = world.getPerWorldStorage();
-        String id = getID(world);
-        WiWorldData ret = (WiWorldData) storage.getOrLoadData(WiWorldData.class, id);
-        if(ret == null) {
-            storage.setData(id, ret = new WiWorldData(id));
-        }
-        ret.world = world;
-        return ret;
-    }
-    
-    public static WiWorldData getNonCreate(World world) {
-        MapStorage storage = world.getPerWorldStorage();
-        WiWorldData data = (WiWorldData) storage.getOrLoadData(WiWorldData.class, getID(world));
-        if(data != null) data.world = world;
-        return data;
-    }
-    
-    @Override
-    public boolean isDirty() {
-        return true;
-    }
-    
-    private void debug(Object msg) {
-        AcademyCraft.log.info("WiWorldData: " + msg);
+        tag.put("net", tag1);
+
+        CompoundTag tag2 = new CompoundTag();
+        saveNode(tag2);
+        tag.put("node", tag2);
     }
 
+    private void debug(Object msg) {
+        if (AcademyCraft.DEBUG_MODE)
+            AcademyCraft.LOGGER.info("WiWorldData: " + msg);
+    }
 }

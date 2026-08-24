@@ -1,15 +1,10 @@
 package cn.academy.event;
 
 import cn.academy.energy.api.block.IWirelessTile;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.common.eventhandler.Event;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.eventbus.api.Event;
 
-/**
- * Base class of any wireless event.
- * All WirelessEvent should only be executed in SERVER side.
- * @author WeathFolD
- */
 public class WirelessEvent extends Event {
 
     public final IWirelessTile tile;
@@ -18,12 +13,11 @@ public class WirelessEvent extends Event {
         tile = _tile;
     }
 
-    public TileEntity getTileEntity() {
-        return (TileEntity) tile;
+    public BlockEntity getBlockEntity() {
+        return (BlockEntity) tile;
     }
 
-    public World getWorld() {
-        return getTileEntity().getWorld();
+    public Level getWorld() {
+        return getBlockEntity().getLevel();
     }
-
 }

@@ -1,73 +1,68 @@
 package cn.academy.ability.vanilla.teleporter;
 
 import cn.academy.ability.Category;
-import cn.academy.ability.Skill;
+import cn.academy.ability.CategoryManager;
 import cn.academy.ability.vanilla.VanillaCategories;
-import cn.academy.ability.vanilla.teleporter.passiveskill.*;
-import cn.academy.ability.vanilla.teleporter.skill.*;
+import cn.academy.ability.vanilla.teleporter.skill.ThreateningTeleport;
 
-/**
- * @author WeAthFolD
- */
-public class CatTeleporter extends Category {
+public final class CatTeleporter {
 
-    public static final Skill
-        dimFolding = DimFoldingTheorem.instance,
-        spaceFluct = SpaceFluctuation.instance,
-        markTP = MarkTeleport$.MODULE$,
-        locTP = LocationTeleport$.MODULE$,
-        penetrateTP = PenetrateTeleport.instance,
-        threateningTP = ThreateningTeleport.instance,
-        shiftTP = ShiftTeleport.instance,
-        fleshRipping = FleshRipping.instance,
-        flashing = Flashing.instance;
+    public static final Category CATEGORY = new Category("teleporter");
 
-    public CatTeleporter() {
-        super("teleporter");
-        setColorStyle(164, 164, 164, 145);
+    private CatTeleporter() {}
 
-        threateningTP.setPosition(14, 42);
-        dimFolding.setPosition(50, 75);
-        penetrateTP.setPosition(60, 46);
-        markTP.setPosition(70, 16);
-        fleshRipping.setPosition(130, 12);
-        locTP.setPosition(118, 50);
-        shiftTP.setPosition(175, 47);
-        spaceFluct.setPosition(160, 80);
-        flashing.setPosition(220, 20);
+    public static void register() {
 
-        // Lv1
-        this.addSkill(threateningTP);
-        this.addSkill(dimFolding);
+        CATEGORY.setColorStyle(164, 164, 164, 145);
 
-        // Lv2
-        this.addSkill(penetrateTP);
-        this.addSkill(markTP);
+        ThreateningTeleport.INSTANCE.setPosition(14, 42);
+        cn.academy.ability.vanilla.teleporter.skill.PenetrateTeleport.INSTANCE.setPosition(60, 46);
 
-        // Lv3
-        this.addSkill(fleshRipping);
-        this.addSkill(locTP);
+        CATEGORY.addSkill(ThreateningTeleport.INSTANCE);
 
-        // Lv4
-        this.addSkill(shiftTP);
-        this.addSkill(spaceFluct);
+        VanillaCategories.addGenericSkills(CATEGORY);
 
-        // Lv5
-        this.addSkill(flashing);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.skill.PenetrateTeleport.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.skill.PenetrateTeleport.INSTANCE
+                .setParent(ThreateningTeleport.INSTANCE, 0.5f);
 
-        VanillaCategories.addGenericSkills(this);
+        cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.INSTANCE.setPosition(118, 50);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.INSTANCE
+                .setParent(cn.academy.ability.vanilla.teleporter.skill.PenetrateTeleport.INSTANCE, 0.8f);
 
-        // Assign deps
-        dimFolding.setParent(threateningTP, 0.2f);
-        penetrateTP.setParent(threateningTP, 0.5f);
-        markTP.setParent(threateningTP, 0.4f);
-        fleshRipping.setParent(markTP, 0.5f);
-        fleshRipping.addSkillDep(penetrateTP, 0.5f);
-        locTP.setParent(penetrateTP, 0.8f);
-        locTP.addSkillDep(markTP, 0.8f);
-        shiftTP.setParent(locTP, 0.5f);
-        spaceFluct.setParent(shiftTP, 0.0f);
-        flashing.setParent(shiftTP, 0.8f);
+        cn.academy.ability.vanilla.teleporter.skill.MarkTeleport.INSTANCE.setPosition(70, 16);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.skill.MarkTeleport.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.skill.MarkTeleport.INSTANCE
+                .setParent(ThreateningTeleport.INSTANCE, 0.4f);
+
+        cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.INSTANCE
+                .addSkillDep(cn.academy.ability.vanilla.teleporter.skill.MarkTeleport.INSTANCE, 0.8f);
+
+        cn.academy.ability.vanilla.teleporter.skill.ShiftTeleport.INSTANCE.setPosition(175, 47);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.skill.ShiftTeleport.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.skill.ShiftTeleport.INSTANCE
+                .setParent(cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.INSTANCE, 0.5f);
+
+        cn.academy.ability.vanilla.teleporter.skill.Flashing.INSTANCE.setPosition(220, 20);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.skill.Flashing.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.skill.Flashing.INSTANCE
+                .setParent(cn.academy.ability.vanilla.teleporter.skill.ShiftTeleport.INSTANCE, 0.8f);
+
+        cn.academy.ability.vanilla.teleporter.passiveskill.DimFoldingTheorem.INSTANCE.setPosition(50, 75);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.passiveskill.DimFoldingTheorem.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.passiveskill.DimFoldingTheorem.INSTANCE
+                .setParent(ThreateningTeleport.INSTANCE, 0.2f);
+
+        cn.academy.ability.vanilla.teleporter.passiveskill.SpaceFluctuation.INSTANCE.setPosition(160, 80);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.teleporter.passiveskill.SpaceFluctuation.INSTANCE);
+        cn.academy.ability.vanilla.teleporter.passiveskill.SpaceFluctuation.INSTANCE
+                .setParent(cn.academy.ability.vanilla.teleporter.skill.ShiftTeleport.INSTANCE, 0.0f);
+
+        cn.academy.ability.vanilla.teleporter.skill.LocationTeleport.Net.init();
+
+        CategoryManager.INSTANCE.register(CATEGORY);
+
+        VanillaCategories.addLateGenericSkills(CATEGORY);
     }
-
 }

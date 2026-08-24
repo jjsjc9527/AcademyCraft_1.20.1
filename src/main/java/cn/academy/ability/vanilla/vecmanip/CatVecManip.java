@@ -1,53 +1,77 @@
 package cn.academy.ability.vanilla.vecmanip;
 
 import cn.academy.ability.Category;
+import cn.academy.ability.CategoryManager;
 import cn.academy.ability.vanilla.VanillaCategories;
-import cn.academy.ability.vanilla.vecmanip.skill.*;
+import cn.academy.ability.vanilla.vecmanip.skill.DirectedShock;
 
-public class CatVecManip extends Category {
+public final class CatVecManip {
 
-    public CatVecManip() {
-        super("vecmanip");
-        setColorStyle(0,0,0);
+    public static final Category CATEGORY = new Category("vecmanip");
 
-        DirectedShock.setPosition(16, 45);
-        Groundshock.setPosition(64, 85);
-        VecAccel.setPosition(76, 40);
-        VecDeviation.setPosition(145, 53);
-        DirectedBlastwave.setPosition(136, 80);
-        StormWing.setPosition(130, 20);
-        BloodRetrograde.setPosition(204, 83);
-        VecReflection.setPosition(210, 50);
-        PlasmaCannon.setPosition(175, 14);
+    private CatVecManip() {}
 
-        // Level 1
-        addSkill(DirectedShock$.MODULE$);
-        addSkill(Groundshock$.MODULE$);
+    public static void register() {
 
-        // 2
-        addSkill(VecAccel$.MODULE$);
-        addSkill(VecDeviation$.MODULE$);
+        CATEGORY.setColorStyle(0, 0, 0);
 
-        // 3
-        addSkill(DirectedBlastwave$.MODULE$);
-        addSkill(StormWing$.MODULE$);
+        DirectedShock.INSTANCE.setPosition(16, 45);
 
-        // 4
-        addSkill(BloodRetrograde$.MODULE$);
-        addSkill(VecReflection$.MODULE$);
+        CATEGORY.addSkill(DirectedShock.INSTANCE);
 
-        // 5
-        addSkill(PlasmaCannon$.MODULE$);
+        VanillaCategories.addGenericSkills(CATEGORY);
 
-        Groundshock.setParent(DirectedShock$.MODULE$);
-        VecAccel.setParent(DirectedShock$.MODULE$);
-        VecDeviation.setParent(VecAccel$.MODULE$);
-        DirectedBlastwave.setParent(Groundshock$.MODULE$);
-        StormWing.setParent(VecAccel$.MODULE$);
-        BloodRetrograde.setParent(DirectedBlastwave$.MODULE$);
-        VecReflection.setParent(VecDeviation$.MODULE$);
-        PlasmaCannon.setParent(StormWing$.MODULE$);
+        cn.academy.ability.vanilla.vecmanip.skill.Groundshock.INSTANCE.setPosition(64, 85);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.Groundshock.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.skill.Groundshock.INSTANCE
+                .setParent(DirectedShock.INSTANCE);
 
-        VanillaCategories.addGenericSkills(this);
+        cn.academy.ability.vanilla.vecmanip.skill.DirectedBlastwave.INSTANCE.setPosition(136, 80);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.DirectedBlastwave.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.skill.DirectedBlastwave.INSTANCE
+                .setParent(cn.academy.ability.vanilla.vecmanip.skill.Groundshock.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.skill.VecAccel.INSTANCE.setPosition(76, 40);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.VecAccel.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.skill.VecAccel.INSTANCE
+                .setParent(DirectedShock.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.skill.VecDeviation.INSTANCE.setPosition(210, 50);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.VecDeviation.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.skill.VecDeviation.INSTANCE
+                .setParent(cn.academy.ability.vanilla.vecmanip.skill.VecAccel.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.skill.VecDeviation.init();
+
+        cn.academy.ability.vanilla.vecmanip.skill.StormWing.INSTANCE.setPosition(130, 20);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.StormWing.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.skill.StormWing.INSTANCE
+                .setParent(cn.academy.ability.vanilla.vecmanip.skill.VecAccel.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.skill.PlasmaCannon.INSTANCE.setPosition(175, 14);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.skill.PlasmaCannon.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.skill.PlasmaCannon.INSTANCE
+                .setParent(cn.academy.ability.vanilla.vecmanip.skill.StormWing.INSTANCE, 0.8f);
+
+        CategoryManager.INSTANCE.register(CATEGORY);
+
+        VanillaCategories.addLateGenericSkills(CATEGORY);
+
+        cn.academy.ability.vanilla.vecmanip.advanced.DualWing.INSTANCE.setPosition(10, 62);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.advanced.DualWing.INSTANCE);
+
+        cn.academy.ability.vanilla.vecmanip.advanced.DualWing.INSTANCE
+                .addSkillDep(cn.academy.ability.vanilla.vecmanip.skill.StormWing.INSTANCE, 1.0f);
+
+        cn.academy.ability.vanilla.vecmanip.advanced.DualWing.init();
+
+        cn.academy.ability.vanilla.vecmanip.advanced.AbyssStride.INSTANCE.setPosition(80, 62);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.advanced.AbyssStride.INSTANCE);
+        cn.academy.ability.vanilla.vecmanip.advanced.AbyssStride.INSTANCE
+                .setParent(cn.academy.ability.vanilla.vecmanip.advanced.DualWing.INSTANCE, 1.0f);
+
+        cn.academy.ability.vanilla.vecmanip.advanced.AbsoluteAbility.INSTANCE.setPosition(218, 63);
+        CATEGORY.addSkill(cn.academy.ability.vanilla.vecmanip.advanced.AbsoluteAbility.INSTANCE);
     }
 }

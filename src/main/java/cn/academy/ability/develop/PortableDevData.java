@@ -5,37 +5,35 @@ import cn.academy.energy.api.IFItemManager;
 import cn.lambdalib2.datapart.DataPart;
 import cn.lambdalib2.datapart.EntityData;
 import cn.lambdalib2.datapart.RegDataPart;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * The Developer instance for portable developer attached one per player.
- * @author WeAthFolD
- */
-@RegDataPart(EntityPlayer.class)
-public class PortableDevData extends DataPart<EntityPlayer> implements IDeveloper {
-    
-    public static PortableDevData get(EntityPlayer player) {
+@RegDataPart(Player.class)
+public class PortableDevData extends DataPart<Player> implements IDeveloper {
+
+    public static PortableDevData get(Player player) {
         return EntityData.get(player).getPart(PortableDevData.class);
     }
 
+    @Nullable
     private ItemStack stack() {
-        ItemStack stack = getEntity().getHeldItemMainhand();
-        return stack != null && stack.getItem() == ACItems.developer_portable ? stack : null;
+        ItemStack stack = getEntity().getMainHandItem();
+        return stack.getItem() == ACItems.DEVELOPER_PORTABLE.get() ? stack : null;
     }
 
     @Override
-    public DeveloperType getType() {
+    public DeveloperType getDeveloperType() {
         return DeveloperType.PORTABLE;
     }
 
     @Override
     public boolean tryPullEnergy(double amount) {
         ItemStack stack = stack();
-        if(stack == null)
-            return false;
-        return IFItemManager.instance.pull(stack, amount, true) == amount;
+        if (stack == null) return false;
+        IFItemManager m = IFItemManager.instance;
+        if (m.getEnergy(stack) < amount) return false;
+        return m.pull(stack, amount, true) == amount;
     }
 
     @Override

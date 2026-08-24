@@ -1,0 +1,8 @@
+newmtl base
+map_Kd #base
+newmtl pillar
+map_Kd #pillar
+newmtl main
+map_Kd #main
+newmtl fan
+map_Kd #fan

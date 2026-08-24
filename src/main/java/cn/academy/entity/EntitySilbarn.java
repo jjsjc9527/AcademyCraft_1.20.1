@@ -1,271 +1,228 @@
 package cn.academy.entity;
 
-import cn.academy.Resources;
-import cn.academy.client.sound.ACSounds;
-import cn.lambdalib2.particle.Particle;
-import cn.lambdalib2.particle.ParticleFactory;
-import cn.lambdalib2.particle.decorators.ParticleDecorator;
-import cn.lambdalib2.registry.StateEventCallback;
-import cn.lambdalib2.registry.mc.RegEntity;
-import cn.lambdalib2.registry.mc.RegEntityRender;
-import cn.lambdalib2.render.obj.ObjLegacyRender;
-import cn.lambdalib2.util.*;
-import cn.lambdalib2.util.entityx.EntityAdvanced;
-import cn.lambdalib2.util.entityx.EntityCallback;
-import cn.lambdalib2.util.entityx.MotionHandler;
-import cn.lambdalib2.util.entityx.event.CollideEvent;
-import cn.lambdalib2.util.entityx.handlers.Rigidbody;
-import net.minecraft.client.renderer.entity.Render;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.opengl.GL11;
+import cn.academy.ACEntities;
+import cn.academy.ACSounds;
+import cn.lambdalib2.util.RandUtils;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
-import javax.annotation.Nullable;
+public class EntitySilbarn extends Entity {
 
-/**
- * @author WeathFolD
- */
-@RegEntity
-public class EntitySilbarn extends EntityAdvanced
-{
-    private static final DataParameter<Byte> HIT_SYNC = EntityDataManager.createKey(EntitySilbarn.class, DataSerializers.BYTE);
+    private static final double DRAG = 0.8;
 
+    private static final double GRAVITY = 0.12;
 
-    @SideOnly(Side.CLIENT)
-    static ParticleFactory particles;
+    private static final int GRAVITY_DELAY = 50;
 
-    @SideOnly(Side.CLIENT)
-    @StateEventCallback
-    public static void init(FMLInitializationEvent event) {
-        Particle p = new Particle();
-        p.texture = Resources.getTexture("entities/silbarn_frag");
-        p.size = 0.1f;
-        p.gravity = 0.03f;
-        p.customRotation = true;
-        
-        particles = new ParticleFactory(p);
-        particles.addDecorator(new ParticleDecorator() {
-            
-            double vx, vy;
-            final double fac = 25;
-            {
-                double phi = RandUtils.nextDouble() * Math.PI * 2;
-                vx = Math.sin(phi);
-                vy = Math.cos(phi);
-            }
+    private static final int LINGER_AFTER_HIT = 10;
 
-            @SideOnly(Side.CLIENT)
-            @Override
-            public void decorate(Particle particle) {
-                particle.addMotionHandler(new MotionHandler() {
-                    @Override
-                    public String getID() { return "Rotator"; }
-                    @Override
-                    public void onStart() {
-                        particle.rotationYaw = RandUtils.nextFloat() * 360;
-                        particle.rotationPitch = RandUtils.rangef(-90, 90);
-                    }
+    private static final int FRAG_FROM = 18, FRAG_TO = 27;
 
-                    @Override
-                    public void onUpdate() {
-                        particle.rotationYaw += vx * fac;
-                        particle.rotationPitch += vy * fac;
-                    }
-                });
-            }
-            
-        });
-    }
-    
-    boolean hit;
-    
-    double createTime;
-    
-    Vec3d axis = new Vec3d(rand.nextInt(), rand.nextInt(), rand.nextInt());
-    
-    {
-        final Rigidbody rigidbody = new Rigidbody();
-        rigidbody.linearDrag = 0.8;
-        rigidbody.entitySel = EntitySelectors.nothing();
-        
-        this.addMotionHandler(rigidbody);
-        //this.addDaemonHandler(new GravityApply(this, 0.05));
-        executeAfter((EntityCallback<EntitySilbarn>) ent -> rigidbody.gravity = 0.12, 50);
-        setSize(.4f, .4f);
+    private static final int TRICKLE_FROM = 2, TRICKLE_TO = 5;
+
+    private static final EntityDataAccessor<Boolean> HIT =
+            SynchedEntityData.defineId(EntitySilbarn.class, EntityDataSerializers.BOOLEAN);
+
+    private static final EntityDataAccessor<Byte> CRACK =
+            SynchedEntityData.defineId(EntitySilbarn.class, EntityDataSerializers.BYTE);
+
+    private static final int BREAKING_MAX_TICKS = 200;
+
+    private int lingerTicks = 0;
+
+    private boolean fragSpawned = false;
+
+    private int lastCrackSeen = 0;
+
+    private long lastCrackMs = 0;
+
+    private int breakingTicks = 0;
+
+    public EntitySilbarn(EntityType<? extends EntitySilbarn> type, Level level) {
+        super(type, level);
+        this.noCulling = true;
     }
 
-    public EntitySilbarn(EntityPlayer player) {
-        super(player.world);
-        this.regEventHandler(new CollideEvent.CollideHandler() {
-            
-            @Override
-            public void onEvent(CollideEvent event) {
-                if(!hit) {
-                    hit = true;
-                    if(event.result.entityHit instanceof EntitySilbarn)
-                        playSound(Resources.sound("entity.silbarn_heavy"), 0.5f, 1.0f);
-                    else
-                        playSound(Resources.sound("entity.silbarn_light"), 0.5f, 1.0f);
-                    executeAfter(Entity::setDead, 10);
-                }
-            }
-            
-        });
-
-        setPosition(player.posX, player.posY + player.eyeHeight, player.posZ);
-
-        Vec3d look = player.getLookVec();
-        motionX = look.x;
-        motionY = look.y;
-        motionZ = look.z;
-        
-        this.rotationYaw = player.rotationYawHead;
-        this.isAirBorne = true;
-        this.onGround = false;
+    public EntitySilbarn(Level level) {
+        this(ACEntities.SILBARN.get(), level);
     }
 
-    public EntitySilbarn(World world) {
-        super(world);
-        if(SideUtils.isClient())
-        {
-            this.createTime = GameTimer.getTime();
+    public static EntitySilbarn thrownBy(Player player) {
+        EntitySilbarn e = new EntitySilbarn(player.level());
+        Vec3 eye = player.getEyePosition();
+        e.setPos(eye.x, eye.y, eye.z);
 
-            this.regEventHandler(new CollideEvent.CollideHandler() {
-                @Override
-                @SuppressWarnings("sideonly")
-                public void onEvent(CollideEvent event) {
-                    if(!hit) {
-                        RayTraceResult res = event.result;
-                        EnumFacing dir = res.sideHit;
-                        final double mul = 0.1;
-                        double tx = res.hitVec.x + dir.getYOffset() * mul,
-                                ty = res.hitVec.y + dir.getYOffset() * mul,
-                                tz = res.hitVec.z + dir.getZOffset() * mul;
-                        spawnEffects(tx, ty, tz);
-                        setDead();
-                    }
-                    hit = true;
-                }
-            });
+        e.setDeltaMovement(player.getViewVector(1.0f));
+
+        e.setYRot(player.getYHeadRot());
+        e.setXRot(player.getXRot());
+        return e;
+    }
+
+    public static EntitySilbarn thrownBy(Player player, Vec3 dir) {
+        EntitySilbarn e = new EntitySilbarn(player.level());
+        Vec3 eye = player.getEyePosition();
+        e.setPos(eye.x, eye.y, eye.z);
+        Vec3 d = dir.lengthSqr() < 1.0e-8 ? player.getViewVector(1.0f) : dir.normalize();
+        e.setDeltaMovement(d);
+        e.setYRot((float) Math.toDegrees(Math.atan2(-d.x, d.z)));
+        e.setXRot((float) -Math.toDegrees(Math.asin(Math.max(-1, Math.min(1, d.y)))));
+        return e;
+    }
+
+    private static final int TURN_INTERVAL = 10;
+
+    private static final float TURN_RANGE = 180f;
+
+    private float turnAngleAt(int seg) {
+        int h = getId() * 0x9E3779B1 + seg * 0x85EBCA6B;
+        h ^= h >>> 15;
+        h *= 0x2C1B3C6D;
+        h ^= h >>> 12;
+        h ^= h >>> 16;
+        return ((h >>> 8) / (float) (1 << 24) * 2f - 1f) * TURN_RANGE;
+    }
+
+    public float turnRoll() {
+        if (getCrack() == 0 || breakStartTick < 0) {
+            return 0f;
         }
+        return turnAngleAt((tickCount - breakStartTick) / TURN_INTERVAL);
+    }
 
-        
-        this.isAirBorne = true;
-        this.onGround = false;
-    }
-    
+    private int breakStartTick = -1;
+
     @Override
-    public void entityInit() {
-        this.dataManager.register(HIT_SYNC, (byte) 0);
+    protected void defineSynchedData() {
+        entityData.define(HIT, false);
+        entityData.define(CRACK, (byte) 0);
     }
-    
+
     public boolean isHit() {
-        return hit;
-    }
-    
-    @Override
-    public void onUpdate() {
-        super.onUpdate();
-        sync();
+        return entityData.get(HIT);
     }
 
-    @SuppressWarnings("sideonly")
-    private void sync() {
-        if(world.isRemote) {
-            boolean b = dataManager.get(HIT_SYNC) != 0;
-            if(!hit && b) {
-                spawnEffects(posX, posY, posZ);
+    public long lastCrackMs() {
+        return lastCrackMs;
+    }
+
+    public int getCrack() {
+        return entityData.get(CRACK);
+    }
+
+    public boolean isIntact() {
+        return !isHit() && getCrack() == 0;
+    }
+
+    public void setCrack(int percent) {
+        if (level().isClientSide || isHit()) {
+            return;
+        }
+        entityData.set(CRACK, (byte) Math.max(1, Math.min(100, percent)));
+        setDeltaMovement(Vec3.ZERO);
+    }
+
+    public void shatter(boolean heavy) {
+        if (level().isClientSide || isHit()) {
+            return;
+        }
+        entityData.set(HIT, true);
+        setDeltaMovement(Vec3.ZERO);
+        level().playSound(null, getX(), getY(), getZ(),
+                (heavy ? ACSounds.SILBARN_HEAVY : ACSounds.SILBARN_LIGHT).get(),
+                SoundSource.NEUTRAL, 0.5f, 1.0f);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+
+        if (isHit()) {
+            if (level().isClientSide) {
+                if (!fragSpawned) {
+                    fragSpawned = true;
+                    spawnFragments(FRAG_FROM, FRAG_TO);
+                }
+            } else if (++lingerTicks > LINGER_AFTER_HIT) {
+                discard();
             }
-            hit = b;
-        } else {
-            dataManager.set(HIT_SYNC, (byte) (hit ? 1 : 0));
+            return;
+        }
+
+        if (getCrack() > 0) {
+            if (level().isClientSide) {
+                int c = getCrack();
+                if (c > lastCrackSeen) {
+                    if (lastCrackSeen == 0) {
+
+                        breakStartTick = tickCount;
+                    }
+                    lastCrackSeen = c;
+                    lastCrackMs = System.currentTimeMillis();
+                    spawnFragments(TRICKLE_FROM, TRICKLE_TO);
+                }
+            } else if (++breakingTicks > BREAKING_MAX_TICKS) {
+                shatter(true);
+            }
+            return;
+        }
+
+        Vec3 from = position();
+        Vec3 to = from.add(getDeltaMovement());
+        BlockHitResult hit = level().clip(new ClipContext(
+                from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        if (hit.getType() == HitResult.Type.BLOCK) {
+            Vec3 at = hit.getLocation();
+            setPos(at.x, at.y, at.z);
+            shatter(false);
+            return;
+        }
+        setPos(to.x, to.y, to.z);
+
+        Vec3 v = getDeltaMovement();
+        if (tickCount > GRAVITY_DELAY) {
+            v = v.subtract(0, GRAVITY, 0);
+        }
+        setDeltaMovement(v.scale(DRAG));
+    }
+
+    private void spawnFragments(int from, int to) {
+        int n = RandUtils.rangei(from, to);
+        for (int i = 0; i < n; i++) {
+            double vel = RandUtils.ranged(0.08, 0.18);
+            double vsq = vel * vel;
+            double vx = random.nextDouble() * vel;
+            double vy = random.nextDouble() * Math.sqrt(Math.max(0, vsq - vx * vx));
+            double vz = Math.sqrt(Math.max(0, vsq - vx * vx - vy * vy));
+            if (random.nextBoolean()) vx = -vx;
+            if (random.nextBoolean()) vy = -vy;
+            if (random.nextBoolean()) vz = -vz;
+            level().addParticle(cn.academy.ACParticles.SILBARN_FRAG.get(),
+                    getX(), getY(), getZ(), vx, vy + 0.2, vz);
         }
     }
-    
+
     @Override
     public boolean canBeCollidedWith() {
-        return true;
-    }
-    
-    @SideOnly(Side.CLIENT)
-    private void spawnEffects(double tx, double ty, double tz) {
-        int n = RandUtils.rangei(18, 27);
-        for(int i = 0; i < n; ++i) {
-            double vel = RandUtils.ranged(0.08, 0.18),
-                vsq = vel * vel,
-                vx = rand.nextDouble() * vel,
-                vxsq = vx * vx,
-                vy = rand.nextDouble() * Math.sqrt(vsq - vxsq),
-                vz = Math.sqrt(vsq - vxsq - vy * vy);
-            vx *= rand.nextBoolean() ? 1 : -1;
-            vy *= rand.nextBoolean() ? 1 : -1;
-            vz *= rand.nextBoolean() ? 1 : -1;
-            vy += 0.2;
-            
-            particles.setPosition(posX, posY, posZ);
-            particles.setVelocity(vx, vy, vz);
-            world.spawnEntity(particles.next(world));
-        }
-        //TileMatrix
-    }
-    
-    @SideOnly(Side.CLIENT)
-    @RegEntityRender(EntitySilbarn.class)
-    public static class RenderSibarn extends Render<EntitySilbarn> {
-        
-        private final ObjLegacyRender model = Resources.getModel("silbarn");
-        private final ResourceLocation tex = Resources.getTexture("models/silbarn");
-
-        public RenderSibarn(RenderManager renderManager) {
-            super(renderManager);
-        }
-
-        @Override
-        public void doRender(EntitySilbarn var1, double x, double y,
-                double z, float var8, float var9) {
-            EntitySilbarn sibarn = (EntitySilbarn) var1;
-            if(sibarn.hit)
-                return;
-            GL11.glPushMatrix();
-            GL11.glTranslated(x, y, z);
-            RenderUtils.loadTexture(tex);
-            double scale = .05;
-            GL11.glScaled(scale, scale, scale);
-            GL11.glRotated(0.03 * (long)((GameTimer.getTime() - sibarn.createTime) * 1000),
-                    sibarn.axis.x, sibarn.axis.y, sibarn.axis.z);
-            GL11.glRotated(-var1.rotationYaw, 0, 1, 0);
-            GL11.glRotated(90, 1, 0, 0);
-            model.renderAll();
-            GL11.glPopMatrix();
-        }
-
-        @Nullable
-        @Override
-        protected ResourceLocation getEntityTexture(EntitySilbarn entity) {
-            return null;
-        }
+        return false;
     }
 
     @Override
-    protected void readEntityFromNBT(NBTTagCompound tag) {
-        setDead();
+    protected void readAdditionalSaveData(CompoundTag tag) {
+        discard();
     }
 
     @Override
-    protected void writeEntityToNBT(NBTTagCompound tag) {}
-
+    protected void addAdditionalSaveData(CompoundTag tag) {}
 }

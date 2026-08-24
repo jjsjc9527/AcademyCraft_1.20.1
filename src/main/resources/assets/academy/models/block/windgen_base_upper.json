@@ -1,0 +1,10 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/windgen_base_ghost.obj",
+  "flip_v": true,
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "base": "academy:block/transparent",
+    "particle": "academy:item/windgen_base"
+  }
+}

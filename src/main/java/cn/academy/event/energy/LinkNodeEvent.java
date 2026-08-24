@@ -3,12 +3,8 @@ package cn.academy.event.energy;
 import cn.academy.energy.api.block.IWirelessMatrix;
 import cn.academy.energy.api.block.IWirelessNode;
 import cn.academy.event.WirelessEvent;
-import net.minecraftforge.fml.common.eventhandler.Cancelable;
+import net.minecraftforge.eventbus.api.Cancelable;
 
-/**
- * Fired when a node is to be linked.
- * @author WeathFolD
- */
 @Cancelable
 public class LinkNodeEvent extends WirelessEvent {
 
@@ -26,5 +22,4 @@ public class LinkNodeEvent extends WirelessEvent {
         matrix = _matrix;
         pwd = _pwd;
     }
-
 }

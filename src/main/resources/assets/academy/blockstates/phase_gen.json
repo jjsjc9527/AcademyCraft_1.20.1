@@ -1,1 +1,9 @@
-{"variants":{"normal":{"model":"academy:phase_gen"}},"__xconfgen":true}
+{
+  "variants": {
+    "liquid=0": { "model": "academy:block/phase_gen_l0" },
+    "liquid=1": { "model": "academy:block/phase_gen_l1" },
+    "liquid=2": { "model": "academy:block/phase_gen_l2" },
+    "liquid=3": { "model": "academy:block/phase_gen_l3" },
+    "liquid=4": { "model": "academy:block/phase_gen_l4" }
+  }
+}

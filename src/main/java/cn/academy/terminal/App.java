@@ -1,13 +1,11 @@
 package cn.academy.terminal;
 
 import cn.academy.Resources;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- */
 public abstract class App {
 
     int appid;
@@ -22,18 +20,19 @@ public abstract class App {
     }
 
     protected ResourceLocation getTexture(String texname) {
-        return Resources.getTexture("guis/apps/" + name + "/" + texname);
+        return Resources.getTexture("gui/apps/" + name + "/" + texname);
     }
 
     private String localKey(String key) {
-        return "ac.app." + name + "." + key;
+        return "app.academy." + name + "." + key;
     }
 
+    @OnlyIn(Dist.CLIENT)
     protected String local(String key) {
-        return I18n.format(localKey(key));
+        return I18n.get(localKey(key));
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public ResourceLocation getIcon() {
         return icon;
     }
@@ -51,6 +50,7 @@ public abstract class App {
         return name;
     }
 
+    @OnlyIn(Dist.CLIENT)
     public String getDisplayName() {
         return local("name");
     }
@@ -63,7 +63,7 @@ public abstract class App {
         return preInstalled;
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public abstract AppEnvironment createEnvironment();
 
 }

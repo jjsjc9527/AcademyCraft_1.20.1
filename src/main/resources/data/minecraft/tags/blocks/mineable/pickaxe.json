@@ -1,0 +1,29 @@
+{
+    "replace": false,
+    "values": [
+        "academy:constraint_metal",
+        "academy:crystal_ore",
+        "academy:imagsil_ore",
+        "academy:reso_ore",
+        "academy:deepslate_constraint_metal",
+        "academy:deepslate_crystal_ore",
+        "academy:deepslate_imagsil_ore",
+        "academy:deepslate_reso_ore",
+        "academy:machine_frame",
+        "academy:node_basic",
+        "academy:node_standard",
+        "academy:node_advanced",
+        "academy:wireless_generator",
+        "academy:phase_gen",
+        "academy:imag_fusor",
+        "academy:metal_former",
+        "academy:ability_interferer",
+        "academy:matrix",
+        "academy:windgen_base",
+        "academy:windgen_pillar",
+        "academy:windgen_main",
+        "academy:wireless_receiver",
+        "academy:dev_normal",
+        "academy:dev_advanced"
+    ]
+}

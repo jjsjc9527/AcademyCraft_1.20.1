@@ -1,36 +1,35 @@
 package cn.academy.ability.develop.condition;
 
-import cn.academy.ability.Skill;
-import cn.academy.datapart.AbilityData;
 import cn.academy.ability.AbilityLocalization;
+import cn.academy.ability.Skill;
 import cn.academy.ability.develop.DeveloperType;
 import cn.academy.ability.develop.IDeveloper;
-import net.minecraft.util.ResourceLocation;
+import cn.academy.datapart.AbilityData;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * @author WeAthFolD
- */
 public class DevConditionDeveloperType implements IDevCondition {
-    
-    final DeveloperType type;
-    
-    public DevConditionDeveloperType(DeveloperType _type) {
-        type = _type;
+
+    private final DeveloperType type;
+
+    public DevConditionDeveloperType(DeveloperType type) {
+        this.type = type;
     }
 
     @Override
     public boolean accepts(AbilityData data, IDeveloper developer, Skill skill) {
-        return developer.getType().ordinal() >= type.ordinal();
+        return developer.getDeveloperType().ordinal() >= type.ordinal();
     }
-    
+
+    @Nullable
     @Override
     public ResourceLocation getIcon() {
         return type.texture;
     }
 
+    @Nullable
     @Override
     public String getHintText() {
         return AbilityLocalization.instance.machineType(type);
     }
-
 }

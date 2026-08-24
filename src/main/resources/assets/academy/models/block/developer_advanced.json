@@ -1,0 +1,8 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/developer_advanced.obj",
+  "flip_v": true,
+  "textures": {
+    "developer_advanced": "academy:block/developer_advanced"
+  }
+}

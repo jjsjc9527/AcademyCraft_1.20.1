@@ -8,16 +8,17 @@ import cn.academy.energy.impl.VBlocks.VBlock;
 import cn.academy.energy.impl.VBlocks.VNGenerator;
 import cn.academy.energy.impl.VBlocks.VNNode;
 import cn.academy.energy.impl.VBlocks.VNReceiver;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.world.World;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.Level;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 
-/**
- * @author WeAthFolD
- *
- */
 public class NodeConn {
 
     private static final int UPDATE_INTERVAL = 40;
@@ -26,125 +27,125 @@ public class NodeConn {
     private final VNNode node;
 
     private boolean disposed = false;
-    
+
     private List<VNReceiver> receivers = new LinkedList<>();
     private List<VNGenerator> generators = new LinkedList<>();
 
     private List<VNReceiver> toRemoveReceivers = new ArrayList<>();
     private List<VNGenerator> toRemoveGenerators = new ArrayList<>();
-    
+
     public NodeConn(WiWorldData _data, VNNode _node) {
         data = _data;
         node = _node;
     }
-    
-    public NodeConn(WiWorldData _data, NBTTagCompound tag) {
-        data = _data;
-        
-        node = new VNNode(tag.getCompoundTag("node"));
 
-        NBTTagList list = (NBTTagList) tag.getTag("receivers");
-        for(int i = 0; i < list.tagCount(); ++i) {
-            addReceiver(new VNReceiver(list.getCompoundTagAt(i)));
+    public NodeConn(WiWorldData _data, CompoundTag tag) {
+        data = _data;
+
+        node = new VNNode(tag.getCompound("node"));
+
+        ListTag list = tag.getList("receivers", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); ++i) {
+            addReceiver(new VNReceiver(list.getCompound(i)));
         }
-        
-        NBTTagList list2 = (NBTTagList) tag.getTag("generators");
-        for(int i = 0; i < list2.tagCount(); ++i) {
-            addGenerator(new VNGenerator(list2.getCompoundTagAt(i)));
+
+        ListTag list2 = tag.getList("generators", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list2.size(); ++i) {
+            addGenerator(new VNGenerator(list2.getCompound(i)));
         }
     }
-    
-    NBTTagCompound toNBT() {
-        World world = getWorld();
-        
-        NBTTagCompound ret = new NBTTagCompound();
-        
-        NBTTagList list;
-        list = new NBTTagList();
-        for(VNReceiver r : receivers) {
-            if(!r.isLoaded(world) || r.get(world) != null) {
-                list.appendTag(r.toNBT());
+
+    CompoundTag toNBT() {
+        Level world = getWorld();
+
+        CompoundTag ret = new CompoundTag();
+
+        ListTag list;
+        list = new ListTag();
+        for (VNReceiver r : receivers) {
+            if (!r.isLoaded(world) || r.get(world) != null) {
+                list.add(r.toNBT());
             }
         }
-        ret.setTag("receivers", list);
-        
-        list = new NBTTagList();
-        for(VNGenerator g : generators) {
-            if(!g.isLoaded(world) || g.get(world) != null) {
-                list.appendTag(g.toNBT());
+        ret.put("receivers", list);
+
+        list = new ListTag();
+        for (VNGenerator g : generators) {
+            if (!g.isLoaded(world) || g.get(world) != null) {
+                list.add(g.toNBT());
             }
         }
-        ret.setTag("generators", list);
-        
-        ret.setTag("node", node.toNBT());
-        
+        ret.put("generators", list);
+
+        ret.put("node", node.toNBT());
+
         return ret;
     }
-    
+
     public void dispose() {
         disposed = true;
     }
-    
+
     public boolean isDisposed() {
         return disposed;
     }
-    
+
     boolean addReceiver(VNReceiver receiver) {
-        if(getLoad() >= getCapacity() || !checkRange(receiver))
+        if (getLoad() >= getCapacity() || !checkRange(receiver))
             return false;
-        
-        World world = getWorld();
-        if(world != null) {
+
+        Level world = getWorld();
+        if (world != null) {
             NodeConn old = data.getNodeConnection(receiver.get(world));
-            if(old != null) {
+            if (old != null) {
                 old.removeReceiver(receiver);
             }
         }
-        
+
         receivers.add(receiver);
         data.nodeLookup.put(receiver, this);
-        
+
         return true;
     }
-    
+
     void removeReceiver(VNReceiver receiver) {
         toRemoveReceivers.add(receiver);
     }
-    
+
     boolean addGenerator(VNGenerator gen) {
-        if(getLoad() >= getCapacity() || !checkRange(gen))
+        if (getLoad() >= getCapacity() || !checkRange(gen))
             return false;
-        
-        World world = getWorld();
+
+        Level world = getWorld();
         NodeConn old = data.getNodeConnection(gen.get(world));
-        if(old != null) {
+        if (old != null) {
             old.removeGenerator(gen);
         }
-        
+
         generators.add(gen);
         data.nodeLookup.put(gen, this);
-        
+
         return true;
     }
 
     void removeGenerator(VNGenerator gen) {
         toRemoveGenerators.add(gen);
     }
-    
+
     void onAdded(WiWorldData data) {
         data.nodeLookup.put(node, this);
     }
-    
+
     void onCleanup(WiWorldData data) {
-        data.nodeLookup.remove(node);
-        for(VNGenerator gen : generators)
-            data.nodeLookup.remove(gen);
-        for(VNReceiver rec : receivers)
-            data.nodeLookup.remove(rec);
+        data.nodeLookup.remove(node, this);
+        for (VNGenerator gen : generators)
+            data.nodeLookup.remove(gen, this);
+        for (VNReceiver rec : receivers)
+            data.nodeLookup.remove(rec, this);
     }
 
     boolean validate() {
-        World world = getWorld();
+        Level world = getWorld();
         if (!disposed && node.isLoaded(world)) {
             if (node.get(world) == null || (generators.size() == 0 && receivers.size() == 0)) {
                 disposed = true;
@@ -159,14 +160,14 @@ public class NodeConn {
         double range = inode == null ? 1000 : inode.getRange();
         return block.distSq(node) <= range * range;
     }
-    
+
     public void tick() {
         validate();
 
-        World world = getWorld();
+        Level world = getWorld();
         if (node.isLoaded(world)) {
             IWirelessNode iNode = node.get(world);
-            if(iNode == null) {
+            if (iNode == null) {
                 return;
             }
 
@@ -176,11 +177,11 @@ public class NodeConn {
                 Collections.shuffle(generators);
 
                 Iterator<VNGenerator> iter = generators.iterator();
-                while(transferLeft != 0 && iter.hasNext()) {
+                while (transferLeft != 0 && iter.hasNext()) {
                     VNGenerator gen = iter.next();
-                    if(gen.isLoaded(world)) {
+                    if (gen.isLoaded(world)) {
                         IWirelessGenerator igen = gen.get(world);
-                        if(igen == null) {
+                        if (igen == null) {
                             removeGenerator(gen);
                         } else {
                             double cur = iNode.getEnergy();
@@ -188,8 +189,8 @@ public class NodeConn {
                                     Math.min(igen.getBandwidth(), iNode.getMaxEnergy() - cur));
                             double amt = igen.getProvidedEnergy(required);
 
-                            if(amt > required) {
-                                AcademyCraft.log.warn("Energy input overflow for generator " + igen);
+                            if (amt > required) {
+                                AcademyCraft.LOGGER.warn("Energy input overflow for generator " + igen);
                                 amt = required;
                             }
 
@@ -206,14 +207,13 @@ public class NodeConn {
                 Collections.shuffle(receivers);
 
                 Iterator<VNReceiver> iter = receivers.iterator();
-                while(transferLeft != 0 && iter.hasNext()) {
+                while (transferLeft != 0 && iter.hasNext()) {
                     VNReceiver rec = iter.next();
-                    if(rec.isLoaded(world)) {
+                    if (rec.isLoaded(world)) {
                         IWirelessReceiver irec = rec.get(world);
-                        if(irec == null) {
+                        if (irec == null) {
                             removeReceiver(rec);
                         } else {
-
                             double cur = iNode.getEnergy();
                             double give = Math.min(cur, Math.min(transferLeft, irec.getBandwidth()));
                             give = Math.min(irec.getRequiredEnergy(), give);
@@ -227,7 +227,6 @@ public class NodeConn {
                 }
             }
 
-            // Remove toRemove receivers/generators
             data.nodeLookup.keySet().removeAll(toRemoveGenerators);
             generators.removeAll(toRemoveGenerators);
 
@@ -238,28 +237,22 @@ public class NodeConn {
             toRemoveReceivers.clear();
         }
     }
-    
+
     public IWirelessNode getNode() {
         return node.get(getWorld());
     }
-    
-    private World getWorld() {
+
+    private Level getWorld() {
         return data.world;
     }
-    
+
     public int getLoad() {
         return receivers.size() + generators.size();
     }
-    
+
     public int getCapacity() {
-        World world = getWorld();
+        Level world = getWorld();
         IWirelessNode inode = world == null ? null : node.get(getWorld());
         return inode == null ? Integer.MAX_VALUE : inode.getCapacity();
     }
-    
-    private void log(String str) {
-        if(AcademyCraft.DEBUG_MODE)
-            AcademyCraft.log.info("[NodeConn] " + str);
-    }
-    
 }

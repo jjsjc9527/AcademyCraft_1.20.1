@@ -1,0 +1,13 @@
+<svg id="图层_1" data-name="图层 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960.51 133.79">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #daeff1;
+      }
+    </style>
+  </defs>
+  <g id="算力">
+    <polygon class="cls-1" points="69.54 64.99 31.52 26.86 777.73 26.86 777.8 64.99 69.54 64.99"/>
+    <path d="M776.73,27.86,776.8,64H70l-36-36.13h742.8m2-2H29.11L69.12,66H778.81l-.08-40.13Z"/>
+  </g>
+</svg>

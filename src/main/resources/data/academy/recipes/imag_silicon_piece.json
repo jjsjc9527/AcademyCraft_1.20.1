@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shapeless", "ingredients": [ { "item": "academy:wafer" } ], "result": { "item": "academy:imag_silicon_piece", "count": 2 } }

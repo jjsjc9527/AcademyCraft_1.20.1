@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "WWW",
+    "PMP",
+    " E "
+  ],
+  "key": {
+    "W": { "item": "academy:wafer" },
+    "P": { "item": "academy:constraint_plate" },
+    "M": { "item": "academy:machine_frame" },
+    "E": { "item": "academy:energy_convert_component" }
+  },
+  "result": { "item": "academy:wireless_generator" }
+}

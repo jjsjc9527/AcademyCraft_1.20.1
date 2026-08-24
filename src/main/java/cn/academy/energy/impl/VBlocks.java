@@ -1,169 +1,168 @@
 package cn.academy.energy.impl;
 
-import cn.academy.energy.api.block.*;
+import cn.academy.energy.api.block.IWirelessGenerator;
+import cn.academy.energy.api.block.IWirelessMatrix;
+import cn.academy.energy.api.block.IWirelessNode;
+import cn.academy.energy.api.block.IWirelessReceiver;
+import cn.academy.energy.api.block.IWirelessTile;
 import cn.lambdalib2.util.MathUtils;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * @author WeAthFolD
- */
 public class VBlocks {
-    
+
     static abstract class VBlock<T extends IWirelessTile> {
-        
+
         protected final int x, y, z;
         protected final boolean ignoreChunk;
-        
-        public VBlock(TileEntity te, boolean _ignoreChunk) {
-            x = te.getPos().getX();
-            y = te.getPos().getY();
-            z = te.getPos().getZ();
+
+        public VBlock(BlockEntity te, boolean _ignoreChunk) {
+            BlockPos p = te.getBlockPos();
+            x = p.getX();
+            y = p.getY();
+            z = p.getZ();
             ignoreChunk = _ignoreChunk;
         }
-        
-        public VBlock(NBTTagCompound tag, boolean _ignoreChunk) {
-            x = tag.getInteger("x");
-            y = tag.getInteger("y");
-            z = tag.getInteger("z");
+
+        public VBlock(CompoundTag tag, boolean _ignoreChunk) {
+            x = tag.getInt("x");
+            y = tag.getInt("y");
+            z = tag.getInt("z");
             ignoreChunk = _ignoreChunk;
         }
-        
-        public double distSq(VBlock another) {
+
+        public double distSq(VBlock<?> another) {
             return MathUtils.distanceSq(another.x, another.y, another.z, x, y, z);
         }
-        
-        public boolean isLoaded(World world) {
-//            return world.getChunkProvider().chunkExists(x >> 4, z >> 4);
-            return world.isChunkGeneratedAt(x>>4, z>>4);
-        }
-        
-        public T get(World world) {
-            if(!ignoreChunk && !isLoaded(world))
-                return null;
-            if(world == null)
-                return null;
 
-//            no need right now
-//            world.getChunkProvider().loadChunk(x >> 4, z >> 4);
-            
-            TileEntity te = world.getTileEntity(new BlockPos(x, y, z));
-            if(te == null || !isAcceptable(te)) {
+        public boolean isLoaded(Level world) {
+            return world != null && world.hasChunk(x >> 4, z >> 4);
+        }
+
+        @SuppressWarnings("unchecked")
+        public T get(Level world) {
+            if (world == null) {
+                return null;
+            }
+            if (!ignoreChunk && !isLoaded(world)) {
+                return null;
+            }
+            BlockEntity te = world.getBlockEntity(new BlockPos(x, y, z));
+            if (te == null || !isAcceptable(te)) {
                 return null;
             }
             return (T) te;
         }
-        
-        public NBTTagCompound toNBT() {
-            NBTTagCompound tag = new NBTTagCompound();
-            tag.setInteger("x", x);
-            tag.setInteger("y", y);
-            tag.setInteger("z", z);
+
+        public CompoundTag toNBT() {
+            CompoundTag tag = new CompoundTag();
+            tag.putInt("x", x);
+            tag.putInt("y", y);
+            tag.putInt("z", z);
             return tag;
         }
-        
+
         @Override
         public int hashCode() {
             return x ^ y ^ z;
         }
-        
+
         @Override
         public boolean equals(Object obj) {
-            if(obj.getClass() != this.getClass()) {
+            if (obj == null || obj.getClass() != this.getClass()) {
                 return false;
             }
-            VBlock vb = (VBlock) obj;
+            VBlock<?> vb = (VBlock<?>) obj;
             return vb.x == x && vb.y == y && vb.z == z;
         }
-        
+
         @Override
         public String toString() {
             return getClass().getSimpleName() + "[" + x + ", " + y + ", " + z + "]";
         }
-        
-        protected abstract boolean isAcceptable(TileEntity tile);
-        
+
+        protected abstract boolean isAcceptable(BlockEntity tile);
     }
-    
+
     static class VWMatrix extends VBlock<IWirelessMatrix> {
 
         public VWMatrix(IWirelessMatrix te) {
-            super((TileEntity) te, true);
+            super((BlockEntity) te, true);
         }
-        
-        public VWMatrix(NBTTagCompound tag) {
+
+        public VWMatrix(CompoundTag tag) {
             super(tag, true);
         }
 
         @Override
-        protected boolean isAcceptable(TileEntity tile) {
+        protected boolean isAcceptable(BlockEntity tile) {
             return tile instanceof IWirelessMatrix;
         }
-        
     }
-    
+
     static class VWNode extends VBlock<IWirelessNode> {
-        
+
         public VWNode(IWirelessNode te) {
-            super((TileEntity) te, false);
+            super((BlockEntity) te, false);
         }
-        
-        public VWNode(NBTTagCompound tag) {
+
+        public VWNode(CompoundTag tag) {
             super(tag, false);
         }
 
         @Override
-        protected boolean isAcceptable(TileEntity tile) {
+        protected boolean isAcceptable(BlockEntity tile) {
             return tile instanceof IWirelessNode;
         }
-        
     }
-    
+
     static class VNNode extends VBlock<IWirelessNode> {
+
         public VNNode(IWirelessNode te) {
-            super((TileEntity) te, true);
+            super((BlockEntity) te, true);
         }
-        
-        public VNNode(NBTTagCompound tag) {
+
+        public VNNode(CompoundTag tag) {
             super(tag, true);
         }
 
         @Override
-        protected boolean isAcceptable(TileEntity tile) {
+        protected boolean isAcceptable(BlockEntity tile) {
             return tile instanceof IWirelessNode;
         }
     }
-    
+
     static class VNGenerator extends VBlock<IWirelessGenerator> {
+
         public VNGenerator(IWirelessGenerator te) {
-            super((TileEntity) te, true);
+            super((BlockEntity) te, true);
         }
-        
-        public VNGenerator(NBTTagCompound tag) {
+
+        public VNGenerator(CompoundTag tag) {
             super(tag, true);
         }
 
         @Override
-        protected boolean isAcceptable(TileEntity tile) {
+        protected boolean isAcceptable(BlockEntity tile) {
             return tile instanceof IWirelessGenerator;
         }
     }
-    
+
     static class VNReceiver extends VBlock<IWirelessReceiver> {
+
         public VNReceiver(IWirelessReceiver te) {
-            super((TileEntity) te, true);
+            super((BlockEntity) te, true);
         }
-        
-        public VNReceiver(NBTTagCompound tag) {
+
+        public VNReceiver(CompoundTag tag) {
             super(tag, true);
         }
 
         @Override
-        protected boolean isAcceptable(TileEntity tile) {
+        protected boolean isAcceptable(BlockEntity tile) {
             return tile instanceof IWirelessReceiver;
         }
     }
-    
 }

@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "academy:asphyxiation",
+    "academy:asphyxiation_pierce",
+    "academy:vec_reflect_pierce",
+    "academy:skill_pierce"
+  ]
+}

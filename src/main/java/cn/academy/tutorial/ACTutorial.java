@@ -1,21 +1,19 @@
 package cn.academy.tutorial;
 
 import cn.academy.Resources;
-import cn.lambdalib2.util.ResourceUtils;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
-import org.apache.commons.io.IOUtils;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 public class ACTutorial {
 
@@ -23,7 +21,7 @@ public class ACTutorial {
         CRAFT, SMELT, VIEW;
 
         public final ResourceLocation icon = Resources.getTexture(
-                "guis/icons/icon_" + this.name().toLowerCase());
+                "gui/icons/icon_" + this.name().toLowerCase(Locale.ROOT));
     }
 
     public static final boolean SHOW_ALL = false;
@@ -33,15 +31,15 @@ public class ACTutorial {
     private Condition condition = Conditions.alwaysTrue();
     private boolean defaultInstalled = true;
 
-    private List<ViewGroup> previewHandlers = new ArrayList<>();
+    private final List<ViewGroup> previewHandlers = new ArrayList<>();
 
     public ACTutorial(String id) {
-        this.id=id;
+        this.id = id;
     }
 
     public ACTutorial addCondition(Condition condition) {
         defaultInstalled = false;
-        if(this.condition == Conditions.alwaysTrue()) {
+        if (this.condition == Conditions.alwaysTrue()) {
             this.condition = condition;
         } else {
             this.condition = this.condition.or(condition);
@@ -49,8 +47,8 @@ public class ACTutorial {
         return this;
     }
 
-    public ACTutorial addPreview(ViewGroup...handlers) {
-        previewHandlers.addAll(Arrays.asList(handlers));
+    public ACTutorial addPreview(ViewGroup... handlers) {
+        for (ViewGroup h : handlers) previewHandlers.add(h);
         return this;
     }
 
@@ -58,41 +56,45 @@ public class ACTutorial {
         return previewHandlers;
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public String getContent() {
         final String unknown = "![title]\nUNKNOWN \n![brief]\n![content]\n ";
         try {
-            String lang = Minecraft.getMinecraft().gameSettings.language;
-            InputStream stream = ResourceUtils.getResourceStreamNullable(location(lang));
-            if (stream == null) { // Make en_us the default fallback
-                stream = ResourceUtils.getResourceStream(location("en_us"));
-            }
-            if (stream == null) {
-                return unknown;
-            } else {
-                return IOUtils.toString(new InputStreamReader(stream, Charset.forName("UTF-8").newDecoder()));
-            }
-        } catch (NullPointerException|IOException e) {
+            String lang = Minecraft.getInstance().getLanguageManager().getSelected();
+            String s = readMd(lang);
+            if (s == null) s = readMd("en_us");
+            return s == null ? unknown : s;
+        } catch (Exception e) {
             return unknown;
         }
     }
 
-    /**
-     * Note that this method currently requires IO and is inefficient. Don't call it too often.
-     */
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
+    private String readMd(String lang) {
+        try {
+            Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(location(lang));
+            if (opt.isEmpty()) return null;
+            try (InputStream in = opt.get().open()) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @OnlyIn(Dist.CLIENT)
     public String getTitle() {
         String raw = getContent();
         int i1 = raw.indexOf("![title]"),
                 i2 = raw.indexOf("![brief]");
-        return raw.substring(i1+8, i2).trim();
+        return raw.substring(i1 + 8, i2).trim();
     }
 
     private ResourceLocation location(String lang) {
-        return new ResourceLocation("academy:tutorials/" + lang + "/" + id + ".md");
+        return new ResourceLocation("academy", "tutorials/" + lang + "/" + id + ".md");
     }
 
-    public boolean isActivated(EntityPlayer player) {
+    public boolean isActivated(Player player) {
         if (SHOW_ALL)
             return true;
         return this.condition.test(player);

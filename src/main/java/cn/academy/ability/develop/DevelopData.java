@@ -1,37 +1,43 @@
 package cn.academy.ability.develop;
 
 import cn.academy.ability.develop.action.IDevelopAction;
-import cn.lambdalib2.s11n.SerializeDynamic;
-import cn.lambdalib2.s11n.SerializeIncluded;
-import cn.lambdalib2.s11n.SerializeNullable;
 import cn.lambdalib2.datapart.DataPart;
 import cn.lambdalib2.datapart.EntityData;
 import cn.lambdalib2.datapart.RegDataPart;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.fml.LogicalSide;
+import org.jetbrains.annotations.Nullable;
 
-@RegDataPart(EntityPlayer.class)
-public class DevelopData extends DataPart<EntityPlayer> {
+@RegDataPart(Player.class)
+public class DevelopData extends DataPart<Player> {
 
-    public static DevelopData get(EntityPlayer player) {
+    public static DevelopData get(Player player) {
         return EntityData.get(player).getPart(DevelopData.class);
     }
 
-    public enum DevState { IDLE, FAILED, DEVELOPING, DONE }
+    public enum DevState {
+        IDLE, FAILED, DEVELOPING, DONE;
+
+        static DevState byOrdinal(int i) {
+            DevState[] v = values();
+            return (i >= 0 && i < v.length) ? v[i] : IDLE;
+        }
+    }
 
     private boolean dirty = false;
 
-    @SerializeIncluded
-    @SerializeDynamic
-    @SerializeNullable
+    @Nullable
     private IDeveloper developer;
-    private IDevelopAction type;
 
-    @SerializeIncluded
+    @Nullable
+    private DeveloperType devType;
+
+    @Nullable
+    private IDevelopAction action;
+
     private int stim;
-    @SerializeIncluded
     private int maxStim;
-    @SerializeIncluded
     private DevState state = DevState.IDLE;
 
     private int tickThisStim;
@@ -39,47 +45,35 @@ public class DevelopData extends DataPart<EntityPlayer> {
 
     public DevelopData() {
         setTick(true);
+        setClientNeedSync();
     }
 
-    // API
-    /**
-     * Make the player start developing with given Developer and Type.
-     * If currently is developing the previous action will be overridden.
-     */
-    public void startDeveloping(IDeveloper _developer, IDevelopAction _type) {
-        checkSide(Side.SERVER);
+    public void startDeveloping(IDeveloper developer, IDevelopAction action) {
+        checkSide(LogicalSide.SERVER);
 
         resetProgress(false);
-        developer = _developer;
-        type = _type;
-        state = DevState.DEVELOPING;
-        maxStim = type.getStimulations(getEntity());
-        dirty = true;
+        this.developer = developer;
+        this.devType = developer.getDeveloperType();
+        this.action = action;
+        this.state = DevState.DEVELOPING;
+        this.maxStim = action.getStimulations(getEntity());
+        this.dirty = true;
     }
 
-    /**
-     * @return Whether the player is developing ability.
-     */
     public boolean isDeveloping() {
-        return developer != null;
+        return devType != null;
     }
 
-    /**
-     * @return The develop progress [0, 1], 0.0 if not developing
-     */
     public double getDevelopProgress() {
         if (isDeveloping()) {
-            return (double) stim / maxStim + (double) tickThisStim / developer.getType().getTPS();
-        } else {
-            return 0;
+            return (double) stim / maxStim + (double) tickThisStim / devType.getTPS();
         }
+        return 0;
     }
 
-    /**
-     * @return Current developer type or null if not developing
-     */
+    @Nullable
     public IDevelopAction getDevelopType() {
-        return type;
+        return action;
     }
 
     public int getStim() {
@@ -95,24 +89,20 @@ public class DevelopData extends DataPart<EntityPlayer> {
     }
 
     public void abort() {
-        checkSide(Side.SERVER);
-
-        if(state == DevState.DEVELOPING) {
+        checkSide(LogicalSide.SERVER);
+        if (state == DevState.DEVELOPING) {
             resetProgress(true);
         }
     }
 
     public void reset() {
-//        checkSide(Side.SERVER);
-
         resetProgress(false);
     }
 
-    // Internal
-
     private void resetProgress(boolean failed) {
         developer = null;
-        type = null;
+        devType = null;
+        action = null;
         tickSync = 5;
         stim = maxStim = tickThisStim = 0;
         state = failed ? DevState.FAILED : DevState.IDLE;
@@ -121,48 +111,60 @@ public class DevelopData extends DataPart<EntityPlayer> {
 
     @Override
     public void tick() {
-        if(!isClient()) {
-            EntityPlayer player = getEntity();
+        if (isClient()) return;
 
-            if(dirty) {
-                dirty = false;
-                sync();
-            }
+        Player player = getEntity();
 
-            if(isDeveloping()) {
-                DeveloperType devType = developer.getType();
+        if (dirty) {
+            dirty = false;
+            sync();
+        }
 
-                // Sync
-                if(tickSync-- == 0) {
-                    tickSync = 5;
-                    sync();
+        if (!isDeveloping()) return;
+
+        if (tickSync-- == 0) {
+            tickSync = 5;
+            sync();
+        }
+
+        double consume = devType.getCPS() / devType.getTPS();
+        if (!developer.tryPullEnergy(consume)) {
+            resetProgress(true);
+            return;
+        }
+
+        if (++tickThisStim > devType.getTPS()) {
+            tickThisStim = 0;
+            ++stim;
+
+            if (stim >= maxStim) {
+
+                boolean success = action.validate(player, developer);
+                if (success) {
+                    action.onLearned(player);
                 }
-
-                // Logic
-                double consume = devType.getCPS() / devType.getTPS();
-                if(!developer.tryPullEnergy(consume)) {
-                    resetProgress(true);
-                    return;
-                }
-
-                if(++tickThisStim > devType.getTPS()) {
-                    tickThisStim = 0;
-                    ++stim;
-
-                    if(stim >= maxStim) {
-                        // try perform the action.
-                        boolean success = type.validate(player, developer);
-                        if(success) {
-                            type.onLearned(player);
-                        }
-                        resetProgress(!success);
-                        if (success) {
-                            state = DevState.DONE;
-                        }
-                    }
+                resetProgress(!success);
+                if (success) {
+                    state = DevState.DONE;
                 }
             }
         }
     }
 
+    @Override
+    protected void writeSyncData(FriendlyByteBuf buf) {
+        buf.writeByte(devType == null ? -1 : devType.ordinal());
+        buf.writeVarInt(stim);
+        buf.writeVarInt(maxStim);
+        buf.writeByte(state.ordinal());
+    }
+
+    @Override
+    protected void readSyncData(FriendlyByteBuf buf) {
+        int t = buf.readByte();
+        devType = t < 0 ? null : DeveloperType.values()[t];
+        stim = buf.readVarInt();
+        maxStim = buf.readVarInt();
+        state = DevState.byOrdinal(buf.readByte());
+    }
 }

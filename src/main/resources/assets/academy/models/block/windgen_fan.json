@@ -1,0 +1,9 @@
+{
+    "loader": "forge:obj",
+    "model": "academy:models/block/windgen_fan.obj",
+    "flip_v": true,
+    "textures": {
+        "fan": "academy:block/windgen_fan",
+        "particle": "academy:block/windgen_fan"
+    }
+}

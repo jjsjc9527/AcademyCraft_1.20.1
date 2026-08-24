@@ -3,13 +3,8 @@ package cn.academy.event.energy;
 import cn.academy.energy.api.block.IWirelessNode;
 import cn.academy.energy.api.block.IWirelessTile;
 import cn.academy.event.WirelessUserEvent;
-import net.minecraftforge.fml.common.eventhandler.Cancelable;
+import net.minecraftforge.eventbus.api.Cancelable;
 
-/**
- * Fired whenever a wireless user(receiver or generator) is to be linked to a node.
- * Canceled if not correctly linked.
- * @author WeathFolD
- */
 @Cancelable
 public class LinkUserEvent extends WirelessUserEvent {
 
@@ -30,5 +25,4 @@ public class LinkUserEvent extends WirelessUserEvent {
         password = "invalid";
         needAuth = false;
     }
-
 }

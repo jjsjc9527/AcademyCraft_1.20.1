@@ -1,63 +1,72 @@
 package cn.academy.ability.context;
 
+import cn.academy.AcademyCraft;
 import cn.academy.ability.Controllable;
 import cn.academy.ability.context.Context.Status;
-import cn.academy.datapart.CooldownData;
 import cn.academy.ability.ctrl.ClientHandler;
+import cn.academy.client.auxgui.TerminalUI;
 import cn.academy.datapart.CPData;
+import cn.academy.datapart.CooldownData;
 import cn.academy.datapart.PresetData;
 import cn.academy.datapart.PresetData.Preset;
+import cn.academy.event.ability.AbilityActivateEvent;
+import cn.academy.event.ability.AbilityDeactivateEvent;
+import cn.academy.event.ability.FlushControlEvent;
+import cn.academy.event.ability.PresetSwitchEvent;
+import cn.academy.event.ability.PresetUpdateEvent;
 import cn.academy.util.ACKeyManager;
-import cn.academy.AcademyCraft;
-import cn.academy.client.auxgui.TerminalUI;
-import cn.academy.event.ability.*;
 import cn.lambdalib2.auxgui.AuxGuiHandler;
-import cn.lambdalib2.registry.mc.RegEventHandler;
-import cn.lambdalib2.util.ClientUtils;
-import cn.lambdalib2.util.ControlOverrider;
-import cn.lambdalib2.util.SideUtils;
 import cn.lambdalib2.datapart.DataPart;
 import cn.lambdalib2.datapart.EntityData;
 import cn.lambdalib2.datapart.RegDataPart;
+import cn.lambdalib2.input.InputGate;
 import cn.lambdalib2.input.KeyManager;
+import cn.lambdalib2.util.ClientUtils;
+import cn.lambdalib2.util.ControlOverrider;
+import cn.lambdalib2.util.SideUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import net.minecraft.client.resources.I18n;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent.Phase;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.LogicalSide;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-/**
- * Handles objects in client that is player-local and dynamic - Ability keys, cooldown and stuff.
- * @author EAirPeter, WeAthFolD
- */
-@SideOnly(Side.CLIENT)
-@RegDataPart(value=EntityPlayer.class, side=Side.CLIENT)
-public class ClientRuntime extends DataPart<EntityPlayer> {
+@OnlyIn(Dist.CLIENT)
+@RegDataPart(value = Player.class, side = LogicalSide.CLIENT)
+public class ClientRuntime extends DataPart<Player> {
 
     public static final String DEFAULT_GROUP = "def";
     private static final String OVERRIDE_GROUP = "AC_ClientRuntime";
 
     public static ClientRuntime instance() {
-        EntityPlayer player = Minecraft.getMinecraft().player;
+        Player player = Minecraft.getInstance().player;
         Preconditions.checkNotNull(player);
         return EntityData.get(player).getPart(ClientRuntime.class);
     }
 
     public static boolean available() {
-        return Minecraft.getMinecraft().player != null;
+        Player player = Minecraft.getInstance().player;
+        return player != null && EntityData.isReady(player) && EntityData.get(player) != null;
     }
 
-    private final Map<Integer, DelegateNode> delegates = new TreeMap<>(); // Preserve insersion order for rendering
+    private final Map<Integer, DelegateNode> delegates = new TreeMap<>();
     private final Multimap<String, DelegateNode> delegateGroups = ArrayListMultimap.create();
     private final Map<Integer, KeyState> keyStates = new HashMap<>();
 
@@ -70,20 +79,29 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         setTick(true);
     }
 
+    private boolean isLocal() {
+        return getEntity() == Minecraft.getInstance().player;
+    }
+
     @Override
     public void tick() {
+        if (!isLocal()) {
+            return;
+        }
         final CPData cpData = CPData.get(getEntity());
         final CooldownData cdData = CooldownData.of(getEntity());
 
         for (DelegateNode node : delegates.values()) {
             final KeyState state = getKeyState(node.keyID);
-            final boolean keyDown = KeyManager.getKeyDown(node.keyID);
+
+            final boolean keyDown = KeyManager.getKeyDown(node.keyID) && !InputGate.isStale(node.keyID);
 
             boolean shouldAbort =
-                !ClientUtils.isPlayerInGame() ||
-                    cdData.isInCooldown(node.delegate.getSkill(), node.delegate.getIdentifier()) ||
-                    !cpData.canUseAbility() ||
-                    AuxGuiHandler.active().stream().anyMatch(a -> a instanceof TerminalUI);
+                    !ClientUtils.isPlayerInGame() ||
+                            cdData.isInCooldown(node.delegate.getSkill(), node.delegate.getIdentifier()) ||
+                            !cpData.canUseAbility() ||
+                            AuxGuiHandler.active().stream().anyMatch(a -> a instanceof TerminalUI) ||
+                            cn.academy.ability.vanilla.mentalout.Helpless.isHelpless(getEntity());
             final KeyDelegate delegate = node.delegate;
 
             if (keyDown && state.state && !shouldAbort) {
@@ -105,7 +123,6 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
             state.realState = keyDown;
         }
 
-        // Remove dead keys
         {
             Iterator<Entry<Integer, KeyState>> iter = keyStates.entrySet().iterator();
             while (iter.hasNext()) {
@@ -116,7 +133,6 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
             }
         }
 
-        // Update override
         if (ctrlDirty) {
             rebuildOverrides();
         }
@@ -133,19 +149,12 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         requireFlush = true;
     }
 
-    /**
-     * Adds a key delegate into default group
-     */
     public void addKey(int keyID, KeyDelegate delegate) {
         addKey(DEFAULT_GROUP, keyID, delegate);
     }
 
-    /**
-     * Adds a key delegate with specified group. Note that the delegate with same key musn't be previously present, or
-     *  yields an error.
-     */
     public void addKey(String group, int keyID, KeyDelegate delegate) {
-        // Using same key multiple times is currently not supported.
+
         Preconditions.checkState(!delegateGroups.containsKey(keyID));
 
         DelegateNode node = new DelegateNode(delegate, keyID);
@@ -175,14 +184,31 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
     }
 
     public void clearAllKeys() {
-        List<String> all = new ArrayList<>();
-        all.addAll(delegateGroups.keySet());
+        List<String> all = new ArrayList<>(delegateGroups.keySet());
 
         for (String s : all) {
             clearKeys(s);
         }
 
+        defaultGroupSuppress = 0;
+
         rebuildOverrides();
+    }
+
+    private int defaultGroupSuppress = 0;
+
+    public void pushSuppressDefaultGroup() {
+        defaultGroupSuppress++;
+        clearKeys(DEFAULT_GROUP);
+    }
+
+    public void popSuppressDefaultGroup() {
+        if (defaultGroupSuppress > 0) {
+            defaultGroupSuppress--;
+        }
+        if (defaultGroupSuppress == 0) {
+            requireFlush = true;
+        }
     }
 
     public boolean hasActiveDelegate() {
@@ -208,57 +234,44 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
     }
 
     private KeyState getKeyState(int keyID) {
-        if (keyStates.containsKey(keyID)) {
-            return keyStates.get(keyID);
-        } else {
-            KeyState ret = new KeyState();
-            keyStates.put(keyID, ret);
-            return ret;
-        }
+        return keyStates.computeIfAbsent(keyID, k -> new KeyState());
     }
 
-    /**
-     * @return A view of raw delegate data. Modifying yields undefined results.
-     */
     public Multimap<String, DelegateNode> getDelegateRawData() {
         return delegateGroups;
     }
 
-    /**
-     * Adds an activation key handler. The handler is of the highest priority. Allows behaviour alternation
-     *  of activation key.
-     */
     public void addActivateHandler(IActivateHandler handler) {
         activateHandlers.addFirst(handler);
     }
 
-    /**
-     * Removes an activation key handler.
-     */
     public void removeActiveHandler(IActivateHandler handler) {
         activateHandlers.remove(handler);
     }
 
     public IActivateHandler getActivateHandler() {
-        EntityPlayer player = Minecraft.getMinecraft().player;
-        for(IActivateHandler h : activateHandlers) {
-            if(h.handles(player))
+        Player player = Minecraft.getInstance().player;
+        for (IActivateHandler h : activateHandlers) {
+            if (h.handles(player))
                 return h;
         }
         throw new RuntimeException();
     }
 
-    { // Default activate handlers
+    {
+
         addActivateHandler(new IActivateHandler() {
             @Override
-            public boolean handles(EntityPlayer player) {
+            public boolean handles(Player player) {
                 return true;
             }
 
             @Override
-            public void onKeyDown(EntityPlayer player) {
+            public void onKeyDown(Player player) {
                 CPData cpData = CPData.get(player);
-                cpData.setActivateState(!cpData.isActivated());
+
+                cpData.setActivateState(!cpData.isActivated(),
+                        cn.academy.datapart.AbilityToggleSource.PLAYER_KEY);
             }
 
             @Override
@@ -269,12 +282,12 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
 
         addActivateHandler(new IActivateHandler() {
             @Override
-            public boolean handles(EntityPlayer player) {
+            public boolean handles(Player player) {
                 return ClientRuntime.instance().hasActiveDelegate();
             }
 
             @Override
-            public void onKeyDown(EntityPlayer player) {
+            public void onKeyDown(Player player) {
                 ClientRuntime.instance().abortDelegates();
             }
 
@@ -286,7 +299,14 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
     }
 
     private void updateDefaultGroup() {
+        if (!isLocal()) {
+            return;
+        }
         clearKeys(DEFAULT_GROUP);
+
+        if (defaultGroupSuppress > 0) {
+            return;
+        }
 
         Preset preset = PresetData.get(getEntity()).getCurrentPreset();
 
@@ -299,16 +319,21 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
     }
 
     private void rebuildOverrides() {
+        if (!isLocal()) {
+            return;
+        }
         AcademyCraft.debug("RebuildOverrides");
         CPData cpData = CPData.get(getEntity());
 
         ctrlDirty = false;
 
-        int[] set = cpData.isActivated() ? delegates.values().stream().mapToInt(n -> n.keyID).toArray() : new int[0];
+        int[] set = cpData.isActivated()
+                ? delegates.values().stream().mapToInt(n -> n.keyID).toArray()
+                : new int[0];
         ControlOverrider.override(OVERRIDE_GROUP, set);
     }
 
-    private class KeyState {
+    private static class KeyState {
         boolean state = false;
         boolean realState = false;
     }
@@ -336,19 +361,26 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         }
     }
 
-    @SideOnly(Side.CLIENT)
-    public enum Events {
-        @RegEventHandler()
-        instance;
+    public static void bootstrap() {
+        MinecraftForge.EVENT_BUS.register(new Events());
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    public static class Events {
 
         @SubscribeEvent
         public void presetSwitch(PresetSwitchEvent evt) {
+
+            if (!ClientRuntime.available()) return;
             ClientRuntime.instance().updateDefaultGroup();
         }
 
         @SubscribeEvent
         public void presetEdit(PresetUpdateEvent evt) {
+
             if (SideUtils.isClient()) {
+
+                if (!ClientRuntime.available()) return;
                 ClientRuntime.instance().updateDefaultGroup();
             }
         }
@@ -356,6 +388,8 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         @SubscribeEvent
         public void activateAbility(AbilityActivateEvent evt) {
             if (SideUtils.isClient()) {
+
+                if (!ClientRuntime.available()) return;
                 ClientRuntime.instance().updateDefaultGroup();
             }
         }
@@ -363,6 +397,8 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         @SubscribeEvent
         public void deactivateAbility(AbilityDeactivateEvent evt) {
             if (SideUtils.isClient()) {
+
+                if (!ClientRuntime.available()) return;
                 ClientRuntime.instance().clearAllKeys();
             }
         }
@@ -373,20 +409,20 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
                 ClientRuntime.instance().requireFlush = true;
         }
 
-
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public static class ActivateHandlers {
+
         public static IActivateHandler terminatesContext(Context ctx) {
             return new IActivateHandler() {
                 @Override
-                public boolean handles(EntityPlayer player) {
+                public boolean handles(Player player) {
                     return ctx.getStatus() == Status.ALIVE;
                 }
 
                 @Override
-                public void onKeyDown(EntityPlayer player) {
+                public void onKeyDown(Player player) {
                     ctx.terminate();
                 }
 
@@ -398,20 +434,22 @@ public class ClientRuntime extends DataPart<EntityPlayer> {
         }
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public interface IActivateHandler {
 
         String ENDSPECIAL = "endspecial";
 
-        boolean handles(EntityPlayer player);
-        void onKeyDown(EntityPlayer player);
+        boolean handles(Player player);
+
+        void onKeyDown(Player player);
+
         String getHint();
 
         default Optional<String> getHintTranslated() {
             String kname = KeyManager.getKeyName(ACKeyManager.instance.getKeyID(ClientHandler.keyActivate));
             String hint = ClientRuntime.instance().getActivateHandler().getHint();
-            return hint == null ? Optional.empty() : Optional.of("[" + kname + "]: " + I18n.format(
-                    "ac.activate_key." + hint + ".desc"));
+            return hint == null ? Optional.empty() : Optional.of("[" + kname + "]: " + I18n.get(
+                    "activate_key.academy." + hint + ".desc"));
         }
 
     }

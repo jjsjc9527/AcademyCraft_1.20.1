@@ -1,38 +1,22 @@
 package cn.academy.ability.context;
 
+import cn.academy.AcademyCraft;
 import cn.academy.ability.AbilityContext;
 import cn.academy.ability.Skill;
-import cn.academy.AcademyCraft;
 import cn.lambdalib2.s11n.network.NetworkMessage;
 import cn.lambdalib2.s11n.network.NetworkMessage.IMessageDelegate;
 import cn.lambdalib2.util.Debug;
-import net.minecraftforge.fml.common.FMLCommonHandler;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.world.World;
+import cn.lambdalib2.util.SideUtils;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * {@link Context} represents an environment that is bound to a specific player. When a context is activated
- *  via {@link ContextManager#activate(Context)}, a connection of same context is established in server and clients
- *  near the context, making one able to channel messages inside same context through many different sides.
- * <p>
- *     The logic is built upon LambdaLib's NetworkMessage, so the serialization logic is almost the same, except for
- *  Context handles player connections and remote-side creation for you.
- * </p>
- *
- * @see cn.lambdalib2.s11n.network.NetworkMessage
- * @see ContextManager
- * @author WeAthFolD
- */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class Context<TSkill extends Skill> implements IMessageDelegate {
 
-    // Turn this on if you want to debug context message detail
     public static final boolean DEBUG_MSG = false;
 
     public static final String
@@ -40,7 +24,6 @@ public class Context<TSkill extends Skill> implements IMessageDelegate {
         MSG_MADEALIVE = "i_alive",
         MSG_TICK = "i_tick";
 
-    // Key messages for single key context.
     public static final String MSG_KEYDOWN = "keydown";
     public static final String MSG_KEYTICK = "keytick";
     public static final String MSG_KEYUP = "keyup";
@@ -50,22 +33,18 @@ public class Context<TSkill extends Skill> implements IMessageDelegate {
 
     private final ContextManager mgr = ContextManager.instance;
 
-    @SideOnly(Side.CLIENT)
     List<ClientContext> clientContexts;
 
-    public final EntityPlayer player;
+    public Player player;
     public final TSkill skill;
-    public final AbilityContext ctx;
+
+    public AbilityContext ctx;
 
     Status status = Status.CONSTRUCTED;
 
-    int serverID;
+    int serverID = -1;
 
-    /**
-     * Default ctor, must be kept for reflection creation
-     */
-    @SuppressWarnings("sideonly")
-    public Context(EntityPlayer _player, TSkill _skill) {
+    public Context(Player _player, TSkill _skill) {
         player = _player;
         skill = _skill;
 
@@ -76,7 +55,28 @@ public class Context<TSkill extends Skill> implements IMessageDelegate {
         }
     }
 
-    @SideOnly(Side.CLIENT)
+    public boolean rebind(Player fresh) {
+        if (fresh == null || fresh == player) {
+            return false;
+        }
+        AbilityContext freshCtx = AbilityContext.ofIfReady(fresh, skill);
+        if (freshCtx == null) {
+            return false;
+        }
+        player = fresh;
+        ctx = freshCtx;
+
+        if (clientContexts != null) {
+            for (ClientContext cc : clientContexts) {
+                cc.rebind(fresh);
+            }
+        }
+        onRebound();
+        return true;
+    }
+
+    protected void onRebound() {}
+
     private void constructClientContexts() {
         clientContexts = new ArrayList<>();
         for (Function<Context, ClientContext> supplier : ClientContext.clientTypes.get(getClass())) {
@@ -84,117 +84,88 @@ public class Context<TSkill extends Skill> implements IMessageDelegate {
         }
     }
 
-    @SideOnly(Side.CLIENT)
-    public Context(TSkill _skill) {
-        this(Minecraft.getMinecraft().player, _skill);
-    }
-
-    EntityPlayer getPlayer() {
+    Player getPlayer() {
         return player;
     }
-
-    // Lifetime
 
     public Status getStatus() {
         return status;
     }
 
-    /**
-     * @see ContextManager#terminate(Context)
-     */
     public void terminate() {
         ContextManager.instance.terminate(this);
     }
 
-    //
-
-    //
     public final boolean isRemote() {
-        // use world.isRemote
-        return player.world.isRemote;
-//        return FMLCommonHandler.instance().getEffectiveSide().isClient();
+        return player.level().isClientSide();
     }
 
-    @SuppressWarnings("sideonly")
     public final boolean isLocal() {
         if (isRemote()) {
-            return isLocalClient_();
+            return player.equals(SideUtils.getThePlayer());
         } else {
             return false;
         }
     }
-    //
 
-    // Messaging
     public double getRange() {
         return 50.0;
     }
 
-    public void sendToServer(String channel, Object ...args) {
+    public void sendToServer(String channel, Object... args) {
         messageDebug("ToServer: " + channel);
         mgr.mToServer(this, channel, args);
     }
 
-    public void sendToClient(String channel, Object ...args) {
+    public void sendToClient(String channel, Object... args) {
         messageDebug("ToClient: " + channel);
         mgr.mToClient(this, channel, args);
     }
 
-    public void sendToLocal(String channel, Object ...args) {
+    public void sendToLocal(String channel, Object... args) {
         messageDebug("ToLocal: " + channel);
         mgr.mToLocal(this, channel, args);
     }
 
-    public void sendToExceptLocal(String channel, Object ...args) {
+    public void sendToExceptLocal(String channel, Object... args) {
         messageDebug("ToExceptLocal: " + channel);
         mgr.mToExceptLocal(this, channel, args);
     }
 
-    public void sendToSelf(String channel, Object ...args) {
+    public void sendToSelf(String channel, Object... args) {
         messageDebug("ToSelf: " + channel);
         mgr.mToSelf(this, channel, args);
     }
 
+    public void onWatcherJoined(net.minecraft.server.level.ServerPlayer watcher) {}
+
+    public void sendToWatcher(net.minecraft.server.level.ServerPlayer watcher,
+                              String channel, Object... args) {
+        messageDebug("ToWatcher: " + channel);
+        NetworkMessage.sendTo(watcher, this, channel, args);
+    }
+
     private void messageDebug(String s) {
         if (AcademyCraft.DEBUG_MODE && DEBUG_MSG) {
-            Debug.log("[Context]" + (isRemote() ? "[C] " : "[S] " ) +getClass().getSimpleName() + ": " + s);
+            Debug.log("[Context]" + (isRemote() ? "[C] " : "[S] ") + getClass().getSimpleName() + ": " + s);
         }
     }
 
-    //
-
-    // Sugar
-
-    @SideOnly(Side.CLIENT)
-    protected ClientRuntime clientRuntime() {
-        return ClientRuntime.instance();
-    }
-
-    protected World world() {
-        return player.world;
+    protected Level world() {
+        return player.level();
     }
 
     protected void debug(Object message) {
-        AcademyCraft.log.info("[CTX]" + message);
-    }
-    //
-
-    // Ugly hacks
-    @SideOnly(Side.CLIENT)
-    private boolean isLocalClient_() {
-        return Minecraft.getMinecraft().player.equals(player);
+        AcademyCraft.LOGGER.info("[CTX]" + message);
     }
 
     @Override
-    @SuppressWarnings("sideonly")
     public final void onMessage(String channel, Object... args) {
         messageDebug("Recv: " + channel);
-        if (isRemote()) {
+        if (isRemote() && clientContexts != null) {
             for (ClientContext cctx : clientContexts) {
                 NetworkMessage.sendToSelf(cctx, channel, args);
             }
         }
     }
-
-
 }

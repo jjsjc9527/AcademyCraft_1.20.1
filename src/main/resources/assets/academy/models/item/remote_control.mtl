@@ -1,0 +1,29 @@
+newmtl M_Blue
+map_Kd #remote_control
+
+newmtl M_Body
+map_Kd #remote_control
+
+newmtl M_Body_Side
+map_Kd #remote_control
+
+newmtl M_Green
+map_Kd #remote_control
+
+newmtl M_Key_Dark
+map_Kd #remote_control
+
+newmtl M_Key_Light
+map_Kd #remote_control
+
+newmtl M_Key_Mid
+map_Kd #remote_control
+
+newmtl M_Power
+map_Kd #remote_control
+
+newmtl M_Red
+map_Kd #remote_control
+
+newmtl M_Yellow
+map_Kd #remote_control

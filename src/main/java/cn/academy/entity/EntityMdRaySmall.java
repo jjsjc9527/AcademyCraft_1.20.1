@@ -1,80 +1,56 @@
 package cn.academy.entity;
 
-import cn.academy.client.render.entity.ray.RendererRayComposite;
-import cn.academy.client.sound.ACSounds;
-import cn.academy.client.render.particle.MdParticleFactory;
-import cn.lambdalib2.particle.Particle;
-import cn.lambdalib2.registry.mc.RegEntity;
-import cn.lambdalib2.registry.mc.RegEntityRender;
-import cn.lambdalib2.util.Colors;
+import cn.academy.ACEntities;
 import cn.lambdalib2.util.MathUtils;
 import cn.lambdalib2.util.RandUtils;
-import cn.lambdalib2.util.VecUtils;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.util.SoundCategory;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class EntityMdRaySmall extends EntityRayBase {
 
-    public EntityMdRaySmall(World world) {
-        super(world);
+    private static final long WIDTH_BLEND = 500;
+
+    private static final double PARTICLE_RANGE = 10;
+
+    public EntityMdRaySmall(Level level) {
+        super(ACEntities.MD_RAY_SMALL.get(), level);
         this.blendInTime = 200;
         this.blendOutTime = 400;
         this.life = 14;
         this.length = 15.0;
     }
-    
+
     @Override
-    protected void onFirstUpdate() {
-        super.onFirstUpdate();
-        ACSounds.playClient(world,posX, posY, posZ, "md.ray_small",SoundCategory.AMBIENT, 0.8f,1.0f);
+    public void tick() {
+        super.tick();
+        if (isRemoved()) return;
+
+        Vec3 dir = lookVec();
+        Vec3 at = position().add(dir.scale(RandUtils.ranged(0, PARTICLE_RANGE)));
+        level().addParticle(cn.academy.ACParticles.MD.get(),
+                at.x, at.y, at.z,
+                RandUtils.ranged(-.015, .015), RandUtils.ranged(-.015, .015), RandUtils.ranged(-.015, .015));
     }
-    
-    @Override
-    public void onUpdate() {
-        super.onUpdate();
-        Particle p = MdParticleFactory.INSTANCE.next(world,
-//            new Motion3D(this, true).move(RandUtils.ranged(0, 10)).getPosVec(),
-                VecUtils.lookingPos(this, RandUtils.ranged(0, 10)),
-            new Vec3d(RandUtils.ranged(-.015, .015), RandUtils.ranged(-.015, .015), RandUtils.ranged(-.015, .015)));
-        world.spawnEntity(p);
+
+    private Vec3 lookVec() {
+        float f = getXRot() * Mth.DEG_TO_RAD;
+        float f1 = -getYRot() * Mth.DEG_TO_RAD;
+        float cosF = Mth.cos(f);
+        return new Vec3(Mth.sin(f1) * cosF, -Mth.sin(f), Mth.cos(f1) * cosF);
     }
-    
+
     @Override
     public double getWidth() {
         long dt = getDeltaTime();
-        int blendTime = 500;
-
-        if(dt > this.life * 50 - blendTime) {
-            double timeFactor = MathUtils.clampd(0, 1, (double) (dt - (this.life * 50 - blendTime)) / blendTime);
+        long lifeMS = getLifeMS();
+        if (dt > lifeMS - WIDTH_BLEND) {
+            double timeFactor = MathUtils.clampd(0, 1, (double) (dt - (lifeMS - WIDTH_BLEND)) / WIDTH_BLEND);
             return 1 - timeFactor;
         }
-        
         return 1.0;
     }
-
-    @RegEntityRender(EntityMdRaySmall.class)
-    public static class SmallMdRayRender extends RendererRayComposite {
-
-        public SmallMdRayRender(RenderManager manager) {
-            super(manager, "mdray_small");
-            this.cylinderIn.width = 0.03;
-            this.cylinderIn.color.set(216, 248, 216, 230);
-            
-            this.cylinderOut.width = 0.045;
-            this.cylinderOut.color.set(106, 242, 106, 50);
-            
-            this.glow.width = 0.3;
-            this.glow.color.setAlpha(Colors.f2i(0.5f));
-        }
-        
-    }
-
 }

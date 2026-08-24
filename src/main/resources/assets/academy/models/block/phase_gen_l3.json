@@ -1,0 +1,9 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/block/ip_gen.obj",
+  "flip_v": true,
+  "textures": {
+    "tex": "academy:block/ip_gen3",
+    "particle": "academy:item/phase_gen"
+  }
+}

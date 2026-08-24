@@ -1,50 +1,52 @@
 package cn.academy.entity;
 
+import cn.academy.ACEntities;
+import cn.lambdalib2.util.Color;
 import cn.lambdalib2.util.Colors;
-import cn.lambdalib2.util.entityx.EntityAdvanced;
-import net.minecraft.entity.Entity;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.util.Color;
+import cn.lambdalib2.util.GameTimer;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
-public class EntityMarker extends EntityAdvanced
-{
+@OnlyIn(Dist.CLIENT)
+public class EntityMarker extends Entity implements cn.academy.client.render.ACEffect {
 
     public Entity target = null;
-    public Color color = Colors.white();
-    public boolean ignoreDepth = false;
 
-    public EntityMarker(Entity entity) {
-        this(entity.getEntityWorld());
-        setPosition(entity.posX, entity.posY, entity.posZ);
-        setSize(0.5f, 0.5f);
-        target = entity;
+    public float boxWidth = 0.5f, boxHeight = 0.5f;
+    public final Color color = Colors.white();
+
+    public double lastFeedTime = GameTimer.getPausableTime();
+
+    public EntityMarker(Level level) {
+        super(ACEntities.MARKER.get(), level);
+        noCulling = true;
     }
 
-    public EntityMarker(World world) {
-        super(world);
+    public void touch() {
+        lastFeedTime = GameTimer.getPausableTime();
     }
 
-    @Override
-    public void onUpdate() {
-        super.onUpdate();
-        if (target != null)
-            setPosition(target.posX, target.posY, target.posZ);
-    }
-
-    @Override
-    protected void readEntityFromNBT(NBTTagCompound tag) {
-        setDead();
+    public void moveTo2(double x, double y, double z) {
+        xOld = getX();
+        yOld = getY();
+        zOld = getZ();
+        setPos(x, y, z);
     }
 
     @Override
-    protected void writeEntityToNBT(NBTTagCompound tag) {
-    }
+    protected void defineSynchedData() {}
 
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    public boolean effectExpired(double now) {
+        return now - lastFeedTime > 2.0;
+    }
 }

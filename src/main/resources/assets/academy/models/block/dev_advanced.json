@@ -1,1 +1,5 @@
-{"parent":"block/cube_all","textures":{"all":"academy:blocks/dev_advanced"},"__xconfgen":true}
+{
+  "textures": {
+    "particle": "academy:block/developer_advanced"
+  }
+}

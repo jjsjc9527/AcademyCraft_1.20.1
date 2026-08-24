@@ -1,0 +1,9 @@
+{
+    "loader": "forge:obj",
+    "model": "academy:models/block/matrix_shield.obj",
+    "flip_v": true,
+    "textures": {
+        "matrix": "academy:block/matrix",
+        "particle": "academy:block/matrix"
+    }
+}

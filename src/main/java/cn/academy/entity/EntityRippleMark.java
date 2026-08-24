@@ -1,40 +1,38 @@
 package cn.academy.entity;
 
-import cn.academy.client.render.entity.RippleMarkRender;
-import cn.lambdalib2.registry.mc.RegEntity;
+import cn.academy.ACEntities;
+import cn.lambdalib2.util.Color;
 import cn.lambdalib2.util.Colors;
 import cn.lambdalib2.util.GameTimer;
-import cn.lambdalib2.util.entityx.EntityAdvanced;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.util.Color;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
-/**
- * @author WeAthFolD
- */
-@SideOnly(Side.CLIENT)
-public class EntityRippleMark extends EntityAdvanced
-{
+@OnlyIn(Dist.CLIENT)
+public class EntityRippleMark extends Entity implements cn.academy.client.render.ACEffect {
 
     public final Color color = Colors.white();
-    public final double creationTime = GameTimer.getTime();
 
-    public EntityRippleMark(World world) {
-        super(world);
-        setSize(2, 2);
+    public final double creationTime = GameTimer.getPausableTime();
+
+    public EntityRippleMark(Level level) {
+        super(ACEntities.RIPPLE_MARK.get(), level);
+        noCulling = true;
     }
-    
+
     @Override
-    public boolean shouldRenderInPass(int pass) {
-        return pass == 1;
+    protected void defineSynchedData() {}
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag) {}
+
+    @Override
+    public boolean effectExpired(double now) {
+        return false;
     }
-    
-    @Override
-    protected void readEntityFromNBT(NBTTagCompound tag) {}
-
-    @Override
-    protected void writeEntityToNBT(NBTTagCompound tag) {}
-
 }

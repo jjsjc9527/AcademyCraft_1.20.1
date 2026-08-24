@@ -1,0 +1,20 @@
+{
+  "textures": {
+    "0": "academy:item/needle_solid",
+    "particle": "academy:item/needle_solid"
+  },
+  "elements": [
+    {
+      "from": [0, 7.75, 7.75],
+      "to": [16, 8.25, 8.25],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 2], "texture": "#0"},
+        "south": {"uv": [0, 0, 16, 2], "texture": "#0"},
+        "west":  {"uv": [0, 0, 2, 2],  "texture": "#0"},
+        "east":  {"uv": [0, 0, 2, 2],  "texture": "#0"},
+        "up":    {"uv": [0, 0, 16, 2], "texture": "#0"},
+        "down":  {"uv": [0, 0, 16, 2], "texture": "#0"}
+      }
+    }
+  ]
+}

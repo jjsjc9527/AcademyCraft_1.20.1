@@ -1,0 +1,14 @@
+{
+  "loader": "forge:obj",
+  "model": "academy:models/item/silbarn_crystal.obj",
+  "flip_v": true,
+  "textures": {
+    "initialShadingGroup": "academy:item/silbarn_model"
+  },
+  "visibility": {
+    "silbarn": false,
+    "piece_02": false,
+    "piece_03": false,
+    "piece_16": false
+  }
+}

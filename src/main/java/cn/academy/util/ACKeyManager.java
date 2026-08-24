@@ -6,20 +6,16 @@ import cn.academy.terminal.app.settings.PropertyElements;
 import cn.academy.terminal.app.settings.SettingsUI;
 import cn.lambdalib2.input.KeyHandler;
 import cn.lambdalib2.input.KeyManager;
-import net.minecraftforge.common.config.Configuration;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-@SideOnly(Side.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class ACKeyManager extends KeyManager {
 
-    public static KeyManager instance = new ACKeyManager();
+    public static final ACKeyManager instance = new ACKeyManager();
 
-    @Override
-    protected Configuration getConfig() {
-        return AcademyCraft.config;
-    }
+    private ACKeyManager() {}
 
     @SubscribeEvent
     public void onConfigModified(ConfigModifyEvent event) {
@@ -33,5 +29,13 @@ public class ACKeyManager extends KeyManager {
         SettingsUI.addProperty(PropertyElements.KEY, "keys", name, defKeyID, false);
     }
 
-    private ACKeyManager() {}
+    @Override
+    protected int loadKeyID(String name, int defKeyID) {
+        return AcademyCraft.config.get("keys", name, defKeyID).getInt();
+    }
+
+    @Override
+    protected void saveKeyID(String name, int keyID) {
+        AcademyCraft.config.get("keys", name, keyID).set(keyID);
+    }
 }

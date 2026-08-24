@@ -1,55 +1,36 @@
 package cn.academy.energy.api;
 
 import cn.academy.energy.api.item.ImagEnergyItem;
-import cn.academy.support.EnergyItemHelper.EnergyItemManager;
-import cn.lambdalib2.util.StackUtils;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
-/**
- * @author WeathFolD
- */
-public final class IFItemManager implements EnergyItemManager {
+public final class IFItemManager {
 
-    public static IFItemManager instance = new IFItemManager();
+    public static final IFItemManager instance = new IFItemManager();
 
-    private IFItemManager() {
-    }
+    private IFItemManager() {}
 
-    @Override
     public double getEnergy(ItemStack stack) {
-        ImagEnergyItem item = (ImagEnergyItem) stack.getItem();
-        return StackUtils.loadTag(stack).getDouble("energy");
+        return stack.getOrCreateTag().getDouble("energy");
     }
 
     public double getMaxEnergy(ItemStack stack) {
-        ImagEnergyItem item = (ImagEnergyItem) stack.getItem();
-        return item.getMaxEnergy();
+        return ((ImagEnergyItem) stack.getItem()).getMaxEnergy();
     }
 
-    @Override
     public void setEnergy(ItemStack stack, double amt) {
         ImagEnergyItem item = (ImagEnergyItem) stack.getItem();
         amt = Math.min(item.getMaxEnergy(), amt);
-        StackUtils.loadTag(stack).setDouble("energy", amt);
+        stack.getOrCreateTag().putDouble("energy", amt);
 
         int approxDamage = (int) Math.round((1 - amt / getMaxEnergy(stack)) * stack.getMaxDamage());
-        stack.setItemDamage(approxDamage);
+        stack.setDamageValue(approxDamage);
     }
 
-    /**
-     * @return How much energy NOT transfered into stack
-     */
     public double charge(ItemStack stack, double amt) {
         return charge(stack, amt, false);
     }
 
-    /**
-     * @param stack
-     * @param amt Energy trying to charge into stack, can be negative
-     * @param ignoreBandwidth
-     * @return How much energy NOT transfered into stack
-     */
-    @Override
     public double charge(ItemStack stack, double amt, boolean ignoreBandwidth) {
         ImagEnergyItem item = (ImagEnergyItem) stack.getItem();
         double lim = ignoreBandwidth ? Double.MAX_VALUE : item.getBandwidth();
@@ -67,16 +48,6 @@ public final class IFItemManager implements EnergyItemManager {
         return spare;
     }
 
-    public String getDescription(ItemStack stack) {
-        return String.format("%.0f/%.0f IF", getEnergy(stack), getMaxEnergy(stack));
-    }
-
-    @Override
-    public boolean isSupported(ItemStack stack) {
-        return stack.getItem() instanceof ImagEnergyItem;
-    }
-
-    @Override
     public double pull(ItemStack stack, double amt, boolean ignoreBandwidth) {
         ImagEnergyItem item = (ImagEnergyItem) stack.getItem();
 
@@ -90,4 +61,23 @@ public final class IFItemManager implements EnergyItemManager {
         return give;
     }
 
+    public String getDescription(ItemStack stack) {
+        return String.format("%.0f/%.0f IF", getEnergy(stack), getMaxEnergy(stack));
+    }
+
+    public boolean isSupported(ItemStack stack) {
+        return stack.getItem() instanceof ImagEnergyItem;
+    }
+
+    public ItemStack createEmpty(Item item) {
+        ItemStack ret = new ItemStack(item);
+        charge(ret, 0, true);
+        return ret;
+    }
+
+    public ItemStack createFull(Item item) {
+        ItemStack ret = new ItemStack(item);
+        charge(ret, Double.MAX_VALUE, true);
+        return ret;
+    }
 }

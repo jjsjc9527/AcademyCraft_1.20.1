@@ -1,0 +1,36 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/dev_advanced"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/dev_normal"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/matrix"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/phase_gen"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/solar_gen"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/windgen_base"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/windgen_main"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "academy:item/windgen_pillar"
+    }
+  ]
+}

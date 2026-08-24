@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ " P ", "PBP", " P " ], "key": { "P": { "tag": "forge:plates/iron" }, "B": { "item": "minecraft:iron_bars" } }, "result": { "item": "academy:windgen_fan" } }

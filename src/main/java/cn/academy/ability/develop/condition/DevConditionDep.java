@@ -1,41 +1,41 @@
 package cn.academy.ability.develop.condition;
 
 import cn.academy.ability.Skill;
-import cn.academy.datapart.AbilityData;
 import cn.academy.ability.develop.IDeveloper;
-import net.minecraft.util.ResourceLocation;
+import cn.academy.datapart.AbilityData;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * @author WeAthFolD
- */
 public class DevConditionDep implements IDevCondition {
-    
+
     public final Skill dependency;
+
     public final float requiredExp;
-    
-    public DevConditionDep(Skill _dep) {
-        this(_dep, 0.0f);
+
+    public DevConditionDep(Skill dependency) {
+        this(dependency, 0.0f);
     }
-    
-    public DevConditionDep(Skill _dep, float _requiredExp) {
-        dependency = _dep;
-        requiredExp = _requiredExp;
+
+    public DevConditionDep(Skill dependency, float requiredExp) {
+        this.dependency = dependency;
+        this.requiredExp = requiredExp;
     }
 
     @Override
     public boolean accepts(AbilityData data, IDeveloper developer, Skill skill) {
-        return data.isSkillLearned(dependency) &&
-                data.getSkillExp(dependency) >= requiredExp;
+        return data.isSkillLearned(dependency)
+                && data.getSkillExp(dependency) >= requiredExp;
     }
 
+    @Nullable
     @Override
     public ResourceLocation getIcon() {
         return dependency.getHintIcon();
     }
 
+    @Nullable
     @Override
     public String getHintText() {
         return dependency.getDisplayName() + String.format(": %.0f%%", requiredExp * 100);
     }
-
 }
