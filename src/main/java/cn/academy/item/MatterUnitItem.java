@@ -74,7 +74,7 @@ public class MatterUnitItem extends Item {
     private static final String TAG_MATERIAL = "material";
 
     public MatterUnitItem() {
-        super(new Item.Properties().stacksTo(16));
+        super(new Item.Properties().stacksTo(64));
     }
 
     public MatterMaterial getMaterial(ItemStack stack) {

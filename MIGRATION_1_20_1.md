@@ -43,7 +43,7 @@ Windows：
 构建产物：
 
 ```text
-build/libs/academycraft-1.20.1-1.2.5fix-Beta.1.jar
+build/libs/academycraft-1.20.1-1.01.jar
 ```
 
 ## 当前验证结果
